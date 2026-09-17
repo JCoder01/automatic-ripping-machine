@@ -1,6 +1,11 @@
 ###########################################################
 # setup default directories and configs
-FROM automaticrippingmachine/arm-dependencies:1.8.0 AS base
+
+# Override to build on a different base, e.g. a QSV-enabled dependencies
+# image built from Dockerfile.qsv:
+#   docker build --build-arg BASE_IMAGE=arm-dependencies-qsv .
+ARG BASE_IMAGE=automaticrippingmachine/arm-dependencies:1.8.0
+FROM ${BASE_IMAGE} AS base
 
 LABEL org.opencontainers.image.source=https://github.com/automatic-ripping-machine/automatic-ripping-machine
 LABEL org.opencontainers.image.license=MIT

@@ -1,0 +1,87 @@
+# Intel QuickSync (QSV)-enabled variant of arm-dependencies, for hosts with
+# a 6th-gen (Skylake) or newer Intel CPU/iGPU.
+#
+# Build this image first, then build the main Dockerfile on top of it:
+#   docker build -t arm-dependencies-qsv -f Dockerfile.qsv .
+#   docker build --build-arg BASE_IMAGE=arm-dependencies-qsv -t automatic-ripping-machine-qsv .
+#
+# Run/compose requirements (not handled by either Dockerfile):
+#   - pass through the GPU device nodes, e.g.:
+#       devices:
+#         - /dev/dri/renderD128:/dev/dri/renderD128
+#         - /dev/dri/card0:/dev/dri/card0
+#   - set the arm.yaml transcode profile to "H.265 QSV 1080p" (or
+#     "H.265 QSV 2160p 4K")
+#
+# Verify after deploying with:
+#   docker exec <container> vainfo
+#   docker exec <container> HandBrakeCLI --help | grep -A12 "Select video encoder"
+
+ARG ARM_DEPENDENCIES_VERSION=1.8.0
+FROM automaticrippingmachine/arm-dependencies:${ARM_DEPENDENCIES_VERSION}
+
+# Ubuntu 22.04's archived intel-media-va-driver-non-free (22.3.1) only speaks
+# VA-API 1.14. Pull the driver (and matching libva) from Intel's own GPU repo
+# instead, which tracks current VA-API versions:
+# https://dgpu-docs.intel.com/driver/client/overview.html
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends gnupg wget ca-certificates && \
+    wget -qO - https://repositories.intel.com/gpu/intel-graphics.key | \
+        gpg --dearmor --output /usr/share/keyrings/intel-graphics.gpg && \
+    echo "deb [arch=amd64,i386 signed-by=/usr/share/keyrings/intel-graphics.gpg] https://repositories.intel.com/gpu/ubuntu jammy client" \
+        > /etc/apt/sources.list.d/intel-gpu-jammy.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        intel-media-va-driver-non-free \
+        libmfx1 \
+        libmfxgen1 \
+        libvpl2 \
+        libva2 \
+        libva-dev \
+        libva-drm2 \
+        vainfo \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# The HandBrakeCLI shipped in arm-dependencies:1.8.0 was compiled against
+# Ubuntu jammy's stock libva-dev (2.14.0, VA-API 1.14). FFmpeg's QSV code
+# gates its VAAPI device-info path behind a *compile-time*
+# `#if VA_CHECK_VERSION(1, 15, 0)`, so that build permanently took the
+# "else" branch, which unconditionally fails with:
+#   "This version of libva doesn't support retrieving the device information
+#    from the driver. Please consider to upgrade libva to support VA-API 1.15.0"
+# Installing a newer libva at runtime (above) can't undo that - it's baked
+# into the binary. So rebuild HandBrakeCLI from source, now that libva-dev
+# 2.22 (from the Intel repo) is present, mirroring arm-dependencies' own
+# build recipe:
+# https://github.com/automatic-ripping-machine/arm-dependencies/blob/main/scripts/install_handbrake.sh
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        autoconf automake autopoint appstream build-essential cmake git \
+        libass-dev libbz2-dev libfontconfig1-dev libfreetype6-dev libfribidi-dev \
+        libharfbuzz-dev libjansson-dev liblzma-dev libmp3lame-dev libnuma-dev \
+        libogg-dev libopus-dev libsamplerate-dev libspeex-dev libtheora-dev \
+        libtool libtool-bin libturbojpeg0-dev libvorbis-dev libx264-dev libxml2-dev \
+        libvpx-dev m4 make meson nasm ninja-build patch pkg-config tar zlib1g-dev \
+        clang libavcodec-dev libdrm-dev curl \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# libdovi (Dolby Vision) needs a Rust toolchain to build
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain nightly -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN cargo install cargo-c
+
+RUN git clone --depth 1 --branch 1.11.2 https://github.com/HandBrake/HandBrake.git /tmp/handbrake && \
+    cd /tmp/handbrake && \
+    ./configure --disable-gtk --enable-qsv --enable-vce --enable-libdovi \
+        --launch-jobs="$(nproc)" --launch && \
+    make -C build -j"$(nproc)" && \
+    make -C build install && \
+    cp /usr/local/bin/HandBrakeCLI /usr/bin/HandBrakeCLI
+
+# Clean up the toolchain and build tree; keep only the installed binary
+RUN rustup self uninstall -y && rm -rf /root/.cargo /root/.rustup /tmp/handbrake
+
+# The arm user (created in arm-dependencies) is already in the video group;
+# render is also needed for /dev/dri/renderD128 access. -f makes the group
+# creation idempotent if it already exists in the base image.
+RUN groupadd -f render && usermod -aG video,render arm
