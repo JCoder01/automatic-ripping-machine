@@ -117,6 +117,20 @@
                             <hr>
                             <p class="mb-0">{{ jobs.plot }}</p>
                         </div>
+                        <div id="job_progress_section" class="card-body" style="display: none;">
+                            <div id="job_stage"><b>Stage: </b></div>
+                            <div id="job_progress">
+                                <div class="progress">
+                                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+                                        aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">
+                                        <small class="justify-content-center d-flex position-absolute w-100" style="color: black; z-index: 2;">0%</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="job_eta"><b>ETA: </b></div>
+                            <div id="job_cur_fps"><b>CUR FPS: </b></div>
+                            <div id="job_avg_fps"><b>AVG FPS: </b></div>
+                        </div>
                         <div class="card-body">
                             <form method="POST" action="/jobdetailload?job_id={{ jobs.job_id }}">
                                 <table id="tracktable" class="table table-striped" aria-label="Tracks">
@@ -476,6 +490,69 @@
             }
         });
 
+        // Live progress bar - polls this job's own status instead of the dashboard's
+        // full joblist, since only one job's data is needed here.
+        $(function () {
+            const FINISHED_STATUSES = ["success", "fail", "transcode_failed"];
+            let pollTimer = null;
+
+            function jobIsActive(job) {
+                if (job.status === "transcoding") return true;
+                if (job.status === "ripping" && job.stage !== "" && job.progress) return true;
+                if (job.disctype === "music" && job.stage !== "") return true;
+                return false;
+            }
+
+            function updateJobProgress(job) {
+                const section = $("#job_progress_section");
+                if (!jobIsActive(job)) {
+                    section.hide();
+                    return;
+                }
+                section.show();
+                $("#job_stage").html(`<b>Stage: </b>${job.stage}`);
+                $("#job_eta").html(`<b>ETA: </b>${job.eta}`);
+
+                const bar = section.find(".progress-bar");
+                bar.css("width", `${job.progress_round}%`);
+                bar.attr("aria-valuenow", job.progress_round);
+                bar.find("small").text(`${job.progress}%`);
+
+                const curFps = $("#job_cur_fps");
+                if (job.cur_fps === undefined || job.cur_fps === "-1") {
+                    curFps.hide();
+                } else {
+                    curFps.show().html(`<b>CUR FPS: </b>${job.cur_fps}`);
+                }
+
+                const avgFps = $("#job_avg_fps");
+                if (job.avg_fps === undefined || job.avg_fps === "-1") {
+                    avgFps.hide();
+                } else {
+                    avgFps.show().html(`<b>AVG FPS: </b>${job.avg_fps}`);
+                }
+            }
+
+            function pollJobProgress() {
+                $.ajax({
+                    url: "/json?mode=job&job={{ jobs.job_id }}",
+                    type: "get",
+                    timeout: 2000,
+                    success: function (data) {
+                        if (!data.success || !data.result) {
+                            return;
+                        }
+                        updateJobProgress(data.result);
+                        if (FINISHED_STATUSES.includes(data.result.status)) {
+                            clearInterval(pollTimer);
+                        }
+                    }
+                });
+            }
+
+            pollJobProgress();
+            pollTimer = window.setInterval(pollJobProgress, {{ armui_cfg['index_refresh'] }});
+        });
     </script>
 {% endblock %}
 {% block footer %}{{ super() }}{% endblock %}

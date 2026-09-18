@@ -33,6 +33,29 @@ def get_notifications():
     return notification
 
 
+def build_job_result(job):
+    """
+    Build the status/progress dict for a single job - shared by get_x_jobs() (a list of
+    these, for the dashboard's job cards) and get_job() (a single one, for a job's own
+    live progress bar)\n
+    :param job: the Job class instance
+    :return: dict
+    """
+    result = {}
+    job_log = os.path.join(cfg.arm_config['LOGPATH'], str(job.logfile))
+    process_logfile(job_log, job, result)
+    try:
+        result['config'] = job.config.get_d()
+    except AttributeError:
+        result['config'] = "config not found"
+        app.logger.debug("couldn't get config")
+
+    for key, value in job.get_d().items():
+        if key != "config":
+            result[str(key)] = str(value)
+    return result
+
+
 def get_x_jobs(job_status):
     """
     function for getting all Failed/Successful jobs \n
@@ -52,18 +75,7 @@ def get_x_jobs(job_status):
     job_results = {}
     i = 0
     for j in jobs:
-        job_results[i] = {}
-        job_log = os.path.join(cfg.arm_config['LOGPATH'], str(j.logfile))
-        process_logfile(job_log, j, job_results[i])
-        try:
-            job_results[i]['config'] = j.config.get_d()
-        except AttributeError:
-            job_results[i]['config'] = "config not found"
-            app.logger.debug("couldn't get config")
-
-        for key, value in j.get_d().items():
-            if key != "config":
-                job_results[i][str(key)] = str(value)
+        job_results[i] = build_job_result(j)
         i += 1
     if jobs:
         app.logger.debug("jobs  - we have " + str(len(job_results)) + " jobs")
@@ -77,6 +89,24 @@ def get_x_jobs(job_status):
             "results": job_results,
             "arm_name": cfg.arm_config['ARM_NAME'],
             "authenticated": authenticated}
+
+
+def get_job(job_id):
+    """
+    Get live status/progress info for a single job - used for jobdetail.html's own
+    progress bar, so it doesn't need to fetch every active job just to show one\n
+    :param job_id: the job id
+    :return: dict/json
+    """
+    job = Job.query.get(job_id)
+    if job is None:
+        return {"success": False, "mode": "job"}
+
+    return {"success": True,
+            "mode": "job",
+            "result": build_job_result(job),
+            "arm_name": cfg.arm_config['ARM_NAME'],
+            "authenticated": authenticated_state()}
 
 
 def process_logfile(logfile, job, job_results):

@@ -378,6 +378,7 @@ def feed_json():
             },
             'fixperms': {'funct': ui_utils.fix_permissions, 'args': ('j_id',)},
             'joblist': {'funct': json_api.get_x_jobs, 'args': ('joblist',)},
+            'job': {'funct': json_api.get_job, 'args': ('j_id',)},
             'send_item': {'funct': ui_utils.send_to_remote_db, 'args': ('j_id',)},
             'change_job_params': {'funct': json_api.change_job_params, 'args': ('config_id',)},
             'read_notification': {'funct': json_api.read_notification, 'args': ('notify_id',)},
