@@ -12,7 +12,6 @@ from flask_wtf import CSRFProtect
 from arm.ripper.logger import short_format
 
 from flask_login import LoginManager
-import bcrypt  # noqa: F401
 import arm.config.config as cfg
 
 sqlitefile = 'sqlite:///' + cfg.arm_config['DBFILE']

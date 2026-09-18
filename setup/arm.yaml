@@ -282,6 +282,9 @@ EMBY_REFRESH: false
 EMBY_SERVER: ""
 EMBY_PORT: "8096"
 
+# Set to true if your Emby/Jellyfin server requires HTTPS (e.g. reverse-proxied on port 443)
+EMBY_SSL: false
+
 # Emby authentication fluff parameters.  These can be anything.
 EMBY_CLIENT: "ARM"
 EMBY_DEVICE: "ARM"

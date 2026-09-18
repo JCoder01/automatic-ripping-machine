@@ -5,6 +5,7 @@ import os
 import logging
 import subprocess
 import shutil
+import socket
 import time
 import random
 import re
@@ -12,12 +13,10 @@ from logging import Logger
 from pathlib import Path, PurePath
 from math import ceil
 
-import bcrypt
 import requests
 import apprise
 import psutil
-
-from netifaces import interfaces, ifaddresses, AF_INET
+from werkzeug.security import generate_password_hash
 
 import arm.config.config as cfg
 from arm.ripper.ProcessHandler import arm_subprocess
@@ -353,7 +352,8 @@ def scan_emby():
 
     if cfg.arm_config["EMBY_REFRESH"]:
         logging.info("Sending Emby library scan request")
-        url = f"http://{cfg.arm_config['EMBY_SERVER']}:{cfg.arm_config['EMBY_PORT']}/Library/Refresh?api_key={cfg.arm_config['EMBY_API_KEY']}"  # noqa: E501
+        scheme = "https" if cfg.arm_config.get("EMBY_SSL") else "http"
+        url = f"{scheme}://{cfg.arm_config['EMBY_SERVER']}:{cfg.arm_config['EMBY_PORT']}/Library/Refresh?api_key={cfg.arm_config['EMBY_API_KEY']}"  # noqa: E501
         try:
             req = requests.post(url)
             if req.status_code > 299:
@@ -565,9 +565,7 @@ def try_add_default_user():
     """
     try:
         username = "admin"
-        pass1 = "password".encode('utf-8')
-        hashed = bcrypt.gensalt(12)
-        database_adder(User(email=username, password=bcrypt.hashpw(pass1, hashed), hashed=hashed))
+        database_adder(User(email=username, password=generate_password_hash("password")))
         perm_file = Path(PurePath(cfg.arm_config['INSTALLPATH'], "installed"))
         write_permission_file = open(perm_file, "w")
         write_permission_file.write("boop!")
@@ -731,12 +729,11 @@ def check_ip():
         return cfg.arm_config['WEBSERVER_IP']
     # autodetect host IP address
     ip_list = []
-    for interface in interfaces():
-        inet_links = ifaddresses(interface).get(AF_INET, [])
-        for link in inet_links:
-            ip_address = link['addr']
-            if ip_address != '127.0.0.1' and not ip_address.startswith('172'):
-                ip_list.append(ip_address)
+    for addrs in psutil.net_if_addrs().values():
+        for addr in addrs:
+            if addr.family == socket.AF_INET and addr.address != '127.0.0.1' \
+                    and not addr.address.startswith('172'):
+                ip_list.append(addr.address)
     if len(ip_list) > 0:
         return ip_list[0]
     return '127.0.0.1'

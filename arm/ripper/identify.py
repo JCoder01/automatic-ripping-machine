@@ -11,7 +11,7 @@ import json
 from ast import literal_eval
 
 import pydvdid
-import xmltodict
+import xml.etree.ElementTree as ET
 import arm.config.config as cfg
 from arm.models import Job
 
@@ -98,7 +98,7 @@ def identify_bluray(job):
 
     try:
         with open(job.mountpoint + '/BDMV/META/DL/bdmt_eng.xml', "rb") as xml_file:
-            doc = xmltodict.parse(xml_file.read())
+            doc = ET.fromstring(xml_file.read())
     except OSError as error:
         logging.error("Disc is a bluray, but bdmt_eng.xml could not be found. "
                       "Disc cannot be identified.  Error "
@@ -119,13 +119,18 @@ def identify_bluray(job):
             db.session.commit()
             return True
 
-    try:
-        bluray_title = doc['disclib']['di:discinfo']['di:title']['di:name']
-        if not bluray_title:
-            bluray_title = job.label
-    except KeyError:
-        bluray_title = str(job.label)
-        logging.error("Could not parse title from bdmt_eng.xml file.  Disc cannot be identified.")
+    # bdmt_eng.xml tags are namespace-prefixed (e.g. "di:discinfo"); match by local
+    # name only so we don't need to know the exact namespace URI in use.
+    name_el = doc
+    for local_name in ('discinfo', 'title', 'name'):
+        name_el = next((child for child in name_el if child.tag.rsplit('}', 1)[-1] == local_name), None)
+        if name_el is None:
+            break
+    bluray_title = name_el.text if name_el is not None else None
+    if not bluray_title:
+        if name_el is None:
+            logging.error("Could not parse title from bdmt_eng.xml file.  Disc cannot be identified.")
+        bluray_title = job.label
 
     bluray_modified_timestamp = os.path.getmtime(job.mountpoint + '/BDMV/META/DL/bdmt_eng.xml')
     bluray_year = (datetime.datetime.fromtimestamp(bluray_modified_timestamp).strftime('%Y'))

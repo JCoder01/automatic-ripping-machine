@@ -59,6 +59,7 @@ class Config(db.Model):
     EMBY_REFRESH = db.Column(db.Boolean)
     EMBY_SERVER = db.Column(db.String(25))
     EMBY_PORT = db.Column(db.String(6))
+    EMBY_SSL = db.Column(db.Boolean)
     EMBY_CLIENT = db.Column(db.String(25))
     EMBY_DEVICE = db.Column(db.String(50))
     EMBY_DEVICEID = db.Column(db.String(128))

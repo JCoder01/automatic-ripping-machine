@@ -71,6 +71,7 @@
   "EMBY_REFRESH": "# Scan emby library after successful placement of mainfeature (see above)",
   "EMBY_SERVER": "# Server parameters\n# Server can be ip address or domain name",
   "EMBY_PORT": "",
+  "EMBY_SSL": "# Set to true if your Emby/Jellyfin server requires HTTPS (e.g. reverse-proxied on port 443)",
   "EMBY_CLIENT": "# Emby authentication fluff parameters.  These can be anything.\n",
   "EMBY_DEVICE": "",
   "EMBY_DEVICEID": "",

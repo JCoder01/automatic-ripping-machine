@@ -9,13 +9,11 @@ class User(db.Model, UserMixin):
     """
     user_id = db.Column(db.Integer, index=True, primary_key=True)
     email = db.Column(db.String(64))
-    password = db.Column(db.String(128))
-    hash = db.Column(db.String(256))
+    password = db.Column(db.String(256))
 
-    def __init__(self, email=None, password=None, hashed=None):
+    def __init__(self, email=None, password=None):
         self.email = email
         self.password = password
-        self.hash = hashed
 
     def __repr__(self):
         """ Return users name """
