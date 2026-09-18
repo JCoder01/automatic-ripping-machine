@@ -196,7 +196,18 @@ def process_makemkv_logfile(job, job_results):
             # "Saving to MKV file". Track transitions below are instead detected off the id.
             current_track_id = job_stage_index.group(2)
             current_track = str(int(current_track_id) + 1)
-            total_tracks = str(job.no_of_titles) if job.no_of_titles else current_track
+            # job.no_of_titles is the disc's total title count, which is only the right
+            # denominator when MakeMKV is ripping the whole disc in one pass. When tracks
+            # were selected individually (manual override, or auto mode's length filter -
+            # see process_single_tracks), only those tracks get ripped, so the denominator
+            # should be how many were actually selected instead - otherwise e.g. picking 1
+            # of the disc's 2 titles still shows "Track 1/2" for the entire rip.
+            tracks_selected = job.tracks.filter_by(process=True).count()
+            total_tracks = (
+                str(tracks_selected) if tracks_selected
+                else str(job.no_of_titles) if job.no_of_titles
+                else current_track
+            )
             last_track_id = job_batch_info.group(4) if job_batch_info is not None else None
             if last_track_id != current_track_id:
                 app.logger.debug(f"Appending new batch position info for job {job.job_id}: "
@@ -279,8 +290,13 @@ def process_handbrake_logfile(logfile, job, job_results):
 
     if job_status_index:
         try:
+            # group(2) is already the count of tracks actually selected for this rip
+            # (see process_single_tracks()'s "Processing track #X of Y" log line) - use
+            # it directly instead of job.no_of_titles, which is the disc's total title
+            # count and shows the wrong denominator whenever fewer tracks were selected.
             current_index = int(job_status_index.group(1))
-            job.stage = job_results['stage'] = f"{job.stage} - {current_index}/{job.no_of_titles}"
+            total_index = int(job_status_index.group(2))
+            job.stage = job_results['stage'] = f"{job.stage} - {current_index}/{total_index}"
         except Exception as error:
             app.logger.debug(f"Problem finding the current track {error}")
             job.stage = f"{job.stage} - %0%/%0%"
