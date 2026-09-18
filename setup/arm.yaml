@@ -55,11 +55,19 @@ SKIP_TRANSCODE: false
 VIDEOTYPE: "auto"
 
 # Minimum length of track for ARM rip (in seconds)
+# Used as a fallback when the video type could not be identified as a movie or series
 MINLENGTH: "600"
 
 # Maximum length of track for ARM rip (in seconds)
 # Use "99999" to indicate no maximum length
 MAXLENGTH: "99999"
+
+# Minimum length of track for ARM rip when the disc is identified as a movie (in seconds)
+MOVIE_MIN_LENGTH: "1320"
+
+# Minimum length of track for ARM rip when the disc is identified as a series (in seconds)
+# Lower than MOVIE_MIN_LENGTH to allow for short-episode shows
+SHOW_MIN_LENGTH: "300"
 
 # Wait for manual identification
 MANUAL_WAIT: true

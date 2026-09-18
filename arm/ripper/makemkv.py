@@ -594,7 +594,7 @@ def makemkv_info(job, select=None, index=9999, options=None):
     if not isinstance(options, list):
         raise TypeError(options)
     # 1MB cache size to get info on the specified disc(s)
-    info_options = ["info", "--cache=1"] + options + [f"disc:{index:d}", f"--minlength={job.config.MINLENGTH}"]
+    info_options = ["info", "--cache=1"] + options + [f"disc:{index:d}", f"--minlength={utils.min_length_for(job)}"]
     wait_time = job.config.MANUAL_WAIT_TIME
     max_processes = cfg.arm_config["MAX_CONCURRENT_MAKEMKVINFO"]
     job.status = JobState.VIDEO_WAITING.value
@@ -645,7 +645,7 @@ def makemkv_backup(job, rawpath):
     ]
     cmd += shlex.split(job.config.MKV_ARGS)
     cmd += [
-        f"--minlength={job.config.MINLENGTH}",
+        f"--minlength={utils.min_length_for(job)}",
         f"--progress={progress_log(job)}",
         f"disc:{job.drive.mdisc:d}",
         rawpath,
@@ -702,7 +702,7 @@ def makemkv_mkv(job, rawpath):
             f"dev:{job.devpath}",
             "all",
             rawpath,
-            f"--minlength={job.config.MINLENGTH}",
+            f"--minlength={utils.min_length_for(job)}",
         ]
         logging.info("Process all tracks from disc.")
         collections.deque(run(cmd, OutputType.MSG), maxlen=0)
@@ -782,7 +782,7 @@ def rip_mainfeature(job, track, rawpath):
         f"dev:{job.devpath}",
         track.track_number,
         rawpath,
-        f"--minlength={job.config.MINLENGTH}",
+        f"--minlength={utils.min_length_for(job)}",
     ]
     logging.info("Ripping main feature")
     # Possibly update db to say track was ripped
@@ -802,10 +802,10 @@ def process_single_tracks(job, rawpath, mode: str):
     if mode == 'auto':
         # Process single track automatically based on start and finish times
         for track in job.tracks:
-            if track.length < int(job.config.MINLENGTH):
+            if track.length < int(utils.min_length_for(job)):
                 # too short
                 logging.info(f"Track #{track.track_number} of {job.no_of_titles}. Length ({track.length}) "
-                             f"is less than minimum length ({job.config.MINLENGTH}).  Skipping")
+                             f"is less than minimum length ({utils.min_length_for(job)}).  Skipping")
                 track.process = False
 
             elif track.length > int(job.config.MAXLENGTH):
@@ -833,7 +833,7 @@ def process_single_tracks(job, rawpath, mode: str):
         ]
         cmd += shlex.split(job.config.MKV_ARGS)
         cmd += [
-            f"--minlength={job.config.MINLENGTH}",
+            f"--minlength={utils.min_length_for(job)}",
             f"--progress={logfile_base}",
             f"dev:{job.devpath}",
             track.track_number,

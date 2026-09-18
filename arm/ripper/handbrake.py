@@ -163,10 +163,10 @@ def handbrake_all(srcpath, basepath, logfile, job):
         # Don't raise error if we past max titles, skip and continue till HandBrake finishes
         if int(track.track_number) > job.no_of_titles:
             continue
-        if track.length < int(cfg.arm_config["MINLENGTH"]):
+        if track.length < int(utils.min_length_for(job)):
             # too short
             logging.info(f"Track #{track.track_number} of {job.no_of_titles}. "
-                         f"Length ({track.length}) is less than minimum length ({cfg.arm_config['MINLENGTH']}). "
+                         f"Length ({track.length}) is less than minimum length ({utils.min_length_for(job)}). "
                          f"Skipping...")
         elif track.length > int(cfg.arm_config["MAXLENGTH"]):
             # too long

@@ -21,6 +21,8 @@ class Config(db.Model):
     VIDEOTYPE = db.Column(db.String(25))
     MINLENGTH = db.Column(db.String(6))
     MAXLENGTH = db.Column(db.String(6))
+    MOVIE_MIN_LENGTH = db.Column(db.String(6))
+    SHOW_MIN_LENGTH = db.Column(db.String(6))
     MANUAL_WAIT = db.Column(db.Boolean)
     MANUAL_WAIT_TIME = db.Column(db.Integer)
     RAW_PATH = db.Column(db.String(255))

@@ -174,6 +174,22 @@ def convert_job_type(video_type):
     return type_sub_folder
 
 
+def min_length_for(job):
+    """
+    The minimum track length (in seconds) to consider ripping, based on the job's
+    identified video type - movies and series often have very different legitimate
+    minimums (e.g. a 22-minute cutoff would silently exclude a 5-minute kids' show
+    episode). Falls back to the general MINLENGTH when the type isn't known.
+    :param job: current job
+    :return: str minimum length in seconds
+    """
+    if job.video_type == "movie":
+        return job.config.MOVIE_MIN_LENGTH
+    if job.video_type == "series":
+        return job.config.SHOW_MIN_LENGTH
+    return job.config.MINLENGTH
+
+
 def fix_job_title(job):
     """
     Validate the job title remove/add job year as needed\n
@@ -620,7 +636,7 @@ def put_track(job, t_no, seconds, aspect, fps, mainfeature, source, filename="",
         chapters=chapters,
         filesize=filesize
     )
-    job_track.ripped = (seconds > int(job.config.MINLENGTH))
+    job_track.ripped = (seconds > int(min_length_for(job)))
     database_adder(job_track)
 
 
