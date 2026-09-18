@@ -21,7 +21,6 @@ from werkzeug.routing import ValidationError
 import arm.ui.utils as ui_utils
 from arm.ui import app, db, constants, json_api
 from arm.models.job import Job, JobState
-from arm.models.notifications import Notifications
 import arm.config.config as cfg
 from arm.ui.forms import TitleSearchForm, ChangeParamsForm, TrackFormDynamic
 
@@ -149,10 +148,6 @@ def customtitle():
             'title_manual': request.args.get("title"),
             'year': request.args.get("year")
         }
-        notification = Notifications(f"Job: {job.job_id} was updated",
-                                     f'Title: {job.title} ({job.year}) was updated to '
-                                     f'{request.args.get("title")} ({request.args.get("year")})')
-        db.session.add(notification)
         ui_utils.database_updater(args, job)
         flash(f'Custom title changed. Title={job.title}, Year={job.year}.', "success")
         return redirect(url_for('home'))
@@ -224,10 +219,6 @@ def updatetitle():
     job.poster_url = job.poster_url_manual = request.args.get('poster')
 
     job.hasnicetitle = True
-    notification = Notifications(f"Job: {job.job_id} was updated",
-                                 f'Title: {old_title} ({old_year}) was updated to '
-                                 f'{request.args.get("title")} ({request.args.get("year")})')
-    db.session.add(notification)
     db.session.commit()
     flash(f'Title: {old_title} ({old_year}) was updated to '
           f'{request.args.get("title")} ({request.args.get("year")})', "success")
