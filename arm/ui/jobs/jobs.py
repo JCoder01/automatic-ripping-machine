@@ -3,6 +3,7 @@ ARM route blueprint for jobs pages
 Covers
 - jobdetail [GET]
 - jobdetailload [POST]
+- rescan_tracks [POST]
 - titlesearch [GET]
 - custometitle [GET]
 - gettitle / customtitle [GET]
@@ -14,6 +15,9 @@ Covers
 """
 
 import json
+import os
+import subprocess
+import sys
 from flask_login import LoginManager, login_required, current_user  # noqa: F401
 from flask import render_template, request, Blueprint, flash, redirect, url_for
 from werkzeug.routing import ValidationError
@@ -71,12 +75,60 @@ def jobdetail():
         job.plot = search_results['Plot'] if 'Plot' in search_results else "There was a problem getting the plot"
         job.background = search_results['background_url'] if 'background_url' in search_results else None
 
+    # Same movie-vs-series-vs-unknown selection rescan_tracks() uses to apply the override
+    min_length_field = {"movie": "MOVIE_MIN_LENGTH", "series": "SHOW_MIN_LENGTH"}.get(job.video_type, "MINLENGTH")
+    current_min_length = getattr(job.config, min_length_field)
+
     return render_template('jobdetail.html',
                            jobs=job,
                            tracks=tracks,
                            s=search_results,
                            manual_edit=manual_edit,
+                           current_min_length=current_min_length,
                            form=track_form)
+
+
+@route_jobs.route('/rescan_tracks', methods=['POST'])
+@login_required
+def rescan_tracks():
+    """
+    Re-run MakeMKV's track scan for a job waiting on manual track selection, using a
+    caller-supplied minimum track length override (applies to this job only)
+    """
+    job_id = request.args.get('job_id')
+    job = Job.query.get(job_id)
+    if job is None:
+        raise ValueError('Job not found')
+
+    if not (job.manual_mode and job.status == JobState.MANUAL_WAIT_STARTED.value and not job.manual_start):
+        flash("Job is not waiting for manual track selection - cannot rescan", "danger")
+        return redirect(url_for('route_jobs.jobdetail', job_id=job_id))
+
+    try:
+        min_length = int(request.form.get('min_length'))
+    except (TypeError, ValueError):
+        flash("Minimum length must be a whole number of seconds", "danger")
+        return redirect(url_for('route_jobs.jobdetail', job_id=job_id))
+    if min_length < 0:
+        flash("Minimum length can't be negative", "danger")
+        return redirect(url_for('route_jobs.jobdetail', job_id=job_id))
+
+    script = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                          'ripper', 'rescan_tracks.py')
+    try:
+        subprocess.Popen(
+            [sys.executable, script, '--job-id', str(job.job_id), '--min-length', str(min_length)],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as err:
+        app.logger.error(f"Error launching track rescan for job {job_id}: {err}")
+        flash(f"Failed to start rescan: {err}", "danger")
+        return redirect(url_for('route_jobs.jobdetail', job_id=job_id))
+
+    flash("Rescanning disc with the new minimum length - refresh in a few seconds", "success")
+    return redirect(url_for('route_jobs.jobdetail', job_id=job_id))
 
 
 @route_jobs.route('/jobdetailload', methods=['POST'])
