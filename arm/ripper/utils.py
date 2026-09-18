@@ -32,7 +32,15 @@ NOTIFY_TITLE = "ARM notification"
 
 
 class RipperException(Exception):
-    pass
+    """
+    :param already_notified: True if the raiser already sent the user a specific,
+        accurate notify() about this - main.py's top-level handler then skips its
+        own generic "fatal error" notification instead of piling a second, more
+        confusing one on top of it.
+    """
+    def __init__(self, *args, already_notified: bool = False):
+        super().__init__(*args)
+        self.already_notified = already_notified
 
 
 def notify(job, title: str, body: str):
@@ -193,7 +201,7 @@ def move_files(base_path, filename, job, is_main_feature=False):
     :param str filename: name of file to be moved\n
     :param job: instance of Job class\n
     :param bool is_main_feature: if current is main feature move to main dir
-    :return str: Full movie path
+    :return bool: True if the file was moved (or already at its destination), False if the move failed
     """
     video_title = fix_job_title(job)
     logging.debug(f"Arguments: {base_path} : {filename} : "
@@ -201,7 +209,7 @@ def move_files(base_path, filename, job, is_main_feature=False):
     # If filename is blank skip and return
     if filename == "":
         logging.info(f"{filename} is empty... Skipping")
-        return None
+        return True
 
     movie_path = job.path
     logging.info(f"Moving {job.video_type} {filename} to {movie_path}")
@@ -212,14 +220,13 @@ def move_files(base_path, filename, job, is_main_feature=False):
     if is_main_feature:
         movie_file = os.path.join(movie_path, video_title + "." + job.config.DEST_EXT)
         logging.info(f"Track is the Main Title.  Moving '{os.path.join(base_path, filename)}' to {movie_file}")
-        move_files_main(os.path.join(base_path, filename), movie_file, movie_path)
+        return move_files_main(os.path.join(base_path, filename), movie_file, movie_path)
     else:
         # Don't make the extra's path unless we need it
         make_dir(extras_path)
         logging.info(f"Moving '{os.path.join(base_path, filename)}' to {extras_path}")
         # This also handles series - But it doesn't use the extras folder
-        move_files_main(os.path.join(base_path, filename), os.path.join(extras_path, filename), extras_path)
-    return movie_path
+        return move_files_main(os.path.join(base_path, filename), os.path.join(extras_path, filename), extras_path)
 
 
 def _calculate_filename_similarity(expected_base, actual_base):
@@ -317,7 +324,7 @@ def move_files_main(old_file, new_file, base_path):
     :param str old_file: The file to be moved - must include full path
     :param str new_file: Final destination of file - must include full path
     :param str base_path: The base path of the new file - used for logging
-    :return: None
+    :return bool: True if the file ends up at new_file (moved or already there), False if the move failed
     """
     if not os.path.isfile(new_file):
         # Try to find the file, handling minor naming discrepancies
@@ -327,8 +334,10 @@ def move_files_main(old_file, new_file, base_path):
             shutil.move(actual_old_file, new_file)
         except Exception as error:
             logging.error(f"Unable to move '{actual_old_file}' to '{base_path}' - Error: {error}")
+            return False
     else:
         logging.info(f"File: {new_file} already exists.  Not moving.")
+    return True
 
 
 def move_movie_poster(final_directory, hb_out_path):
@@ -781,7 +790,9 @@ def duplicate_run_check(dev_path):
     logging.info(f"Job was started {job_time}min ago.")
     if (job_time) < 3:
         logging.info("Job was started less than 3min ago.")
-    raise RipperException(f"Job already running on {dev_path}")
+    # Some drives fire udev twice per disc insert, spawning a redundant second run - that's
+    # an internal race we've already handled, not something the user needs alerted about.
+    raise RipperException(f"Job already running on {dev_path}", already_notified=True)
 
 
 def save_disc_poster(final_directory, job):
@@ -826,7 +837,7 @@ def check_for_dupe_folder(have_dupes, hb_out_path, job):
             notify(job, NOTIFY_TITLE, f"ARM Detected a duplicate disc. For {job.title}. "
                                       f"Duplicate rips are disabled. "
                                       f"You can re-enable them from your config file. ")
-            raise RipperException("Duplicate rips are disabled")
+            raise RipperException("Duplicate rips are disabled", already_notified=True)
     logging.info(f"Final Output directory \"{hb_out_path}\"")
     return hb_out_path
 
