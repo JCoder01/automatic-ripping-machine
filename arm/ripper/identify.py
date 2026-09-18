@@ -29,7 +29,9 @@ def find_mount(devpath: str) -> str | None:
 
     :return: Absolute path of mountpoint as ``str`` if any, else ``None``
     """
-    if output := arm_subprocess(["findmnt", "--json", devpath]):
+    # Not being mounted yet is the expected/normal case here (that's what we're checking) -
+    # don't spam a traceback for it, check_mount() handles it by trying to mount.
+    if output := arm_subprocess(["findmnt", "--json", devpath], quiet=True):
         mountpoints = json.loads(output)
         for mountpoint in mountpoints["filesystems"]:
             if os.access(mountpoint["target"], os.R_OK):

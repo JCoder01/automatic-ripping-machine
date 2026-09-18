@@ -26,7 +26,7 @@ if find_spec("arm") is None:
 import arm.config.config as cfg  # noqa E402
 from arm.models.config import Config  # noqa: E402
 from arm.models.job import Job, JobState  # noqa: E402
-from arm.models.system_drives import SystemDrives  # noqa: E402
+from arm.models.system_drives import CDS, SystemDrives  # noqa: E402
 from arm.ripper import (arm_ripper, identify, logger,  # noqa: E402
                         music_brainz, utils)
 from arm.ripper.ARMInfo import ARMInfo  # noqa E402
@@ -184,6 +184,13 @@ def setup():
         logging.info(msg)
         time.sleep(1)
     else:  # no break
+        # udev fires this same wrapper script for every event on the device - including the
+        # tray opening on eject after a rip finishes - with no disc actually present. That's
+        # normal, not fatal, so exit quietly instead of raising (which would send a misleading
+        # "fatal error" notification for what's really just an empty/ejected drive).
+        if drive.tray in (CDS.NO_DISC, CDS.TRAY_OPEN):
+            logging.info(f"No disc in drive [{drive.mount}] - nothing to rip. Exiting quietly.")
+            sys.exit(0)
         raise utils.RipperException(f"Timed out waiting for drive to be ready (ioctl tray status: {drive.tray}).")
 
     # ARM Job starts
@@ -240,27 +247,34 @@ if __name__ == "__main__":
         setup()
         main()
     except Exception as error:
-        logging.critical("A fatal error has occurred and ARM is exiting.")
-        print_stacktrace = (
-            logging.getLogger().getEffectiveLevel() == logging.DEBUG
-            or not isinstance(error, utils.RipperException)
-        )
-        logging.critical(error, exc_info=(error if print_stacktrace else None),)
-
-        if job:
-            utils.notify(
-                job,
-                constants.NOTIFY_TITLE,
-                f"ARM encountered a fatal error processing {job.title}. "
-                f"Check the logs for more details. {error}"
-            )
+        already_notified = getattr(error, "already_notified", False)
+        if already_notified:
+            # The raiser already sent the user a specific, accurate notification
+            # (e.g. "duplicate disc detected") - piling a second, generic "fatal
+            # error" notification on top of it is just confusing noise.
+            logging.info(f"ARM is exiting: {error}")
         else:
-            utils.notify(
-                job,
-                constants.NOTIFY_TITLE,
-                f"ARM encountered a fatal error during job setup."
-                f"Check the logs for more details. {error}"
+            logging.critical("A fatal error has occurred and ARM is exiting.")
+            print_stacktrace = (
+                logging.getLogger().getEffectiveLevel() == logging.DEBUG
+                or not isinstance(error, utils.RipperException)
             )
+            logging.critical(error, exc_info=(error if print_stacktrace else None),)
+
+            if job:
+                utils.notify(
+                    job,
+                    constants.NOTIFY_TITLE,
+                    f"ARM encountered a fatal error processing {job.title}. "
+                    f"Check the logs for more details. {error}"
+                )
+            else:
+                utils.notify(
+                    job,
+                    constants.NOTIFY_TITLE,
+                    f"ARM encountered a fatal error during job setup."
+                    f"Check the logs for more details. {error}"
+                )
         # job is None when setup() fails before a Job row even exists (e.g. the
         # drive never became ready) - nothing to record in that case.
         if job:
