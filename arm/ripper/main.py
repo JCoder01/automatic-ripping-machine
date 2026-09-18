@@ -79,7 +79,7 @@ def log_arm_params(job):
                 "HB_ARGS_DVD", "HB_ARGS_BD", "FFMPEG_CLI", "FFMPEG_LOCAL", "USE_FFMPEG",
                 "FFMPEG_ARGS", "RAW_PATH", "TRANSCODE_PATH",
                 "COMPLETED_PATH", "EXTRAS_SUB", "EMBY_REFRESH", "EMBY_SERVER",
-                "EMBY_PORT", "NOTIFY_RIP", "NOTIFY_TRANSCODE",
+                "EMBY_PORT", "EMBY_SSL", "NOTIFY_RIP", "NOTIFY_TRANSCODE",
                 "MAX_CONCURRENT_TRANSCODES", "MAX_CONCURRENT_MAKEMKVINFO"):
         logging.info(f"{key.lower()}: {str(cfg.arm_config.get(key, '<not given>'))}")
     logging.info("******************* End of config parameters *******************")
@@ -261,8 +261,15 @@ if __name__ == "__main__":
                 f"ARM encountered a fatal error during job setup."
                 f"Check the logs for more details. {error}"
             )
-        job.status = JobState.FAILURE.value
-        job.errors = str(error)
+        # job is None when setup() fails before a Job row even exists (e.g. the
+        # drive never became ready) - nothing to record in that case.
+        if job:
+            # rip_visual_media already marks a failed transcode (after a successful
+            # MakeMKV rip) as TRANSCODE_FAILED rather than a generic failure, since the
+            # raw ripped files are still on disk and retryable - don't clobber that here.
+            if job.status != JobState.TRANSCODE_FAILED.value:
+                job.status = JobState.FAILURE.value
+            job.errors = str(error)
         # Possibly add cleanup section here for failed job files
     else:
         job.status = JobState.SUCCESS.value

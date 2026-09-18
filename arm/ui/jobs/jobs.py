@@ -322,6 +322,7 @@ def feed_json():
         valid_modes = {
             'delete': {'funct': json_api.delete_job, 'args': ('j_id', 'mode')},
             'abandon': {'funct': json_api.abandon_job, 'args': ('j_id',)},
+            'retry_transcode': {'funct': json_api.retry_transcode, 'args': ('j_id',)},
             'full': {'funct': json_api.generate_log, 'args': ('logpath', 'j_id')},
             'search': {'funct': json_api.search, 'args': ('searchq',)},
             'getfailed': {

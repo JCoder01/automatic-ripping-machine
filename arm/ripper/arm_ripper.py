@@ -41,8 +41,10 @@ def rip_visual_media(have_dupes, job, logfile, protection):
     # If dupes rips is disabled this might kill the run
     final_directory = utils.check_for_dupe_folder(have_dupes, final_directory, job)
 
-    # Update the job.path with the final directory
-    utils.database_updater({'path': final_directory}, job)
+    # Update the job.path with the final directory. Also persist transcode_out_path so a
+    # transcode-only retry (see retry_transcode.py) can reuse the exact same staging folder
+    # instead of calling check_for_dupe_folder again and risking a second, differently-suffixed one.
+    utils.database_updater({'path': final_directory, 'transcode_out_path': transcode_out_path}, job)
     # Save poster image from disc if enabled
     utils.save_disc_poster(final_directory, job)
 
@@ -67,9 +69,41 @@ def rip_visual_media(have_dupes, job, logfile, protection):
         logging.info("************* Ripping with MakeMKV completed *************")
         # point HB/FFMPEG to the path MakeMKV ripped to
         transcode_in_path = makemkv_out_path
+        # Persist where the raw files landed so a failed transcode can be retried from
+        # them later without needing the disc re-inserted (see retry_transcode.py)
+        utils.database_updater({'raw_path': makemkv_out_path}, job)
     # Begin transcoding section - only transcode if skip_transcode is false
-    start_transcode(job, logfile, transcode_in_path, transcode_out_path, protection)
+    try:
+        start_transcode(job, logfile, transcode_in_path, transcode_out_path, protection)
+    except Exception as transcode_error:
+        # Distinguish this from a generic failure: MakeMKV already succeeded and
+        # job.raw_path still has the ripped files, so the UI can offer a retry
+        # that skips straight back to transcoding instead of re-ripping the disc.
+        utils.database_updater(
+            {'status': JobState.TRANSCODE_FAILED.value, 'errors': str(transcode_error)}, job)
+        raise
 
+    finish_visual_media(job, transcode_in_path, transcode_out_path, final_directory,
+                        type_sub_folder, use_make_mkv, makemkv_out_path)
+
+
+def finish_visual_media(job, transcode_in_path, transcode_out_path, final_directory,
+                        type_sub_folder, use_make_mkv, makemkv_out_path=None):
+    """
+    Post-processing shared by a normal rip and a transcode-only retry: move the
+    transcoded files to their final location, clean up raw/staging files, and send
+    the completion notification.\n
+    :param job: Current job
+    :param transcode_in_path: Path HandBrake/FFMPEG read from (makemkv_out_path|/dev/srX)
+    :param transcode_out_path: Path HandBrake/FFMPEG put the transcoded files in
+    :param final_directory: job.path - the final media library destination
+    :param type_sub_folder: (movie|tv|unidentified) sub-folder
+    :param use_make_mkv: Was MakeMKV used to rip this job
+    :param makemkv_out_path: MakeMKV's raw output dir, if different from transcode_in_path
+    :return: None
+    """
+    if makemkv_out_path is None:
+        makemkv_out_path = transcode_in_path
     # --------------- POST PROCESSING ---------------
     # If ripped with MakeMKV remove the 'out' folder and set the raw as the output
     logging.debug(f"Transcode status: [{job.config.SKIP_TRANSCODE}] and MakeMKV Status: [{use_make_mkv}]")

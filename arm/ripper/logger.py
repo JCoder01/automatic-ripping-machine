@@ -64,6 +64,30 @@ def setup_job_log(job):
     return log_full
 
 
+def resume_job_log(job):
+    """
+    Re-attach file logging to an already-existing job's logfile\n
+    Unlike setup_job_log, this never renames or creates a new logfile - it's for
+    resuming work on a job that already ran once (e.g. retrying a failed transcode),
+    where we want everything to land in the same logfile the user already has a link to.
+    """
+    log_file = job.logfile
+    log_full = os.path.join(cfg.arm_config['LOGPATH'], log_file)
+
+    logger = logging.getLogger()
+    for handler in logger.handlers:
+        if isinstance(handler, logging.FileHandler):
+            logger.removeHandler(handler)
+
+    logger.addHandler(_create_file_handler(log_file))
+
+    logging.getLogger("apprise").setLevel(logging.WARN)
+    logging.getLogger("requests").setLevel(logging.WARN)
+    logging.getLogger("urllib3").setLevel(logging.WARN)
+
+    return log_full
+
+
 def clean_up_logs(logpath, loglife):
     """
     Delete all log files older than {loglife} days\n
