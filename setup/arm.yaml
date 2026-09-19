@@ -239,7 +239,10 @@ HB_PRESET_DVD: "HQ 720p30 Surround"
 
 # Handbrake preset profile for Blurays
 # Execute "HandBrakeCLI -z" to see a list of all presets
-HB_PRESET_BD: "HQ 1080p30 Surround"
+# Note: presets cap resolution at what's in their name (e.g. "1080p" presets downscale
+# 4K UHD Blu-rays) - "up to 2160p" presets don't upscale regular Blu-rays, so this is
+# safe to use for both
+HB_PRESET_BD: "HQ 2160p60 4K HEVC Surround"
 
 # Extension of the final video file
 DEST_EXT: mkv
