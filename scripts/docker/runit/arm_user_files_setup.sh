@@ -53,7 +53,25 @@ echo "Adding arm user to 'render' group"
 usermod -a -G render arm
 
 ### Setup Files
-chown -R arm:arm /opt/arm
+# The image is built with /opt/arm already owned by ARM_UID:ARM_GID (see the
+# Dockerfile's COPY --chown=${ARM_UID}:${ARM_GID}), so when this deployment's
+# runtime ARM_UID/ARM_GID match what it was built with, ownership is already
+# correct and this recursive chown can be skipped entirely. That matters
+# because /opt/arm - unlike /home/arm or /etc/arm/config, which are host
+# volume mounts - is baked into the image's overlay layers: chowning a file
+# there forces Docker's overlay2 driver to copy it up into the container's
+# writable layer first, and on a freshly pulled image that's thousands of
+# small copy-ups, taking minutes. If ARM_UID/ARM_GID were overridden away
+# from what the image was built with, this still falls back to the full
+# chown, same as before.
+opt_arm_uid=$(stat -c "%u" /opt/arm)
+opt_arm_gid=$(stat -c "%g" /opt/arm)
+if [ "$opt_arm_uid" != "$ARM_UID" ] || [ "$opt_arm_gid" != "$ARM_GID" ]; then
+  echo "Updating /opt/arm ownership to $ARM_UID:$ARM_GID (image was built for $opt_arm_uid:$opt_arm_gid)"
+  chown -R arm:arm /opt/arm
+else
+  echo "[OK]: /opt/arm already owned by $ARM_UID:$ARM_GID, skipping recursive chown"
+fi
 
 # Check ownership of the ARM home folder
 check_folder_ownership "/home/arm"

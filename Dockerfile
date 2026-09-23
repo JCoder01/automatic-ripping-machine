@@ -69,8 +69,21 @@ RUN chmod +x /etc/my_init.d/*.sh
 # Final image pushed for use
 FROM base AS automatic-ripping-machine
 
+# Override to match the UID/GID this container will actually run as (i.e. the
+# ARM_UID/ARM_GID env vars passed at `docker run`/deploy time) so /opt/arm is
+# already owned correctly on first boot. arm_user_files_setup.sh skips its
+# recursive chown of /opt/arm when ownership already matches - and unlike
+# /home/arm or /etc/arm/config (host volume mounts), /opt/arm is baked into
+# the image's overlay layers, so a mismatched chown there is what forces
+# Docker's overlay2 driver to copy up every file into the writable layer
+# before it can be rechowned, which is slow. Left at the historical default
+# (1000) so a plain `docker build .` with no extra args behaves exactly as
+# before for anyone whose deployment also defaults to 1000:1000.
+ARG ARM_UID=1000
+ARG ARM_GID=1000
+
 # Copy over source code
-COPY . /opt/arm/
+COPY --chown=${ARM_UID}:${ARM_GID} . /opt/arm/
 
 # Our docker udev rule
 RUN ln -sv /opt/arm/setup/51-docker-arm.rules /lib/udev/rules.d/
