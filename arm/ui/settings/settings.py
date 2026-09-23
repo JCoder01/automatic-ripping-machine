@@ -16,6 +16,7 @@ Covers
 """
 import platform
 import importlib
+import json
 import re
 import subprocess
 from datetime import datetime
@@ -61,6 +62,28 @@ def is_read_only(path: os.PathLike) -> bool:
 
 
 route_settings.add_app_template_filter(mask_last, name='mask_last')
+
+
+def htmx_settings_response(success, form_name):
+    """
+    For an htmx request (settings.html's forms all use hx-post), respond with
+    an empty body plus a "showToast" HX-Trigger instead of the JSON dict these
+    routes return for any other caller - app.js turns that event into the same
+    toast addToast() used to build from the old jQuery AJAX success handler.
+    Returns None when the request isn't from htmx, so the caller falls back
+    to its normal `return {...}` JSON response.
+    """
+    if request.headers.get('HX-Request') != 'true':
+        return None
+    response = app.make_response('')
+    if success:
+        note = {
+            'id': f'settings-{int(datetime.now().timestamp() * 1000)}',
+            'title': 'Saved Successfully',
+            'message': f'Saved {form_name} settings',
+        }
+        response.headers['HX-Trigger'] = json.dumps({'showToast': [note]})
+    return response
 
 
 @route_settings.route('/settings')
@@ -205,6 +228,8 @@ def save_settings():
             # arm.yaml is read-only
             app.logger.error(f"{cfg.arm_config_path} is read-only", exc_info=e)
 
+    if (resp := htmx_settings_response(success, 'arm ripper')) is not None:
+        return resp
     return {'success': success, 'settings': cfg.arm_config, 'form': 'arm ripper settings'}
 
 
@@ -236,6 +261,8 @@ def save_ui_settings():
     # Masking the jinja update, otherwise an error is thrown
     # sqlalchemy.orm.exc.DetachedInstanceError: Instance <UISettings at 0x7f294c109fd0>
     # app.jinja_env.globals.update(armui_cfg=arm_ui_cfg)
+    if (resp := htmx_settings_response(success, 'arm ui')) is not None:
+        return resp
     return {'success': success, 'settings': str(arm_ui_cfg), 'form': 'arm ui settings'}
 
 
@@ -249,6 +276,7 @@ def save_abcde():
     """
     success = False
     abcde_cfg_str = ""
+    clean_abcde_str = ""
     form = AbcdeForm()
     if form.validate():
         app.logger.debug(f"routes.save_abcde: Saving new abcde.conf: {cfg.abcde_config_path}")
@@ -267,6 +295,8 @@ def save_abcde():
             app.logger.error(f"{cfg.abcde_config_path} is read-only", exc_info=e)
 
     # If we get to here, there was no post-data
+    if (resp := htmx_settings_response(success, 'abcde')) is not None:
+        return resp
     return {'success': success,
             'settings': clean_abcde_str,
             'form': 'abcde config'}
@@ -295,6 +325,8 @@ def save_apprise_cfg():
         except OSError as e:
             app.logger.error(f"{cfg.apprise_config_path} is read-only", exc_info=e)
     # If we get to here there was no post data
+    if (resp := htmx_settings_response(success, 'Apprise')) is not None:
+        return resp
     return {'success': success, 'settings': cfg.apprise_config, 'form': 'Apprise config'}
 
 

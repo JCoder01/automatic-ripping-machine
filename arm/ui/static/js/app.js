@@ -78,4 +78,12 @@
             (evt.detail.notes || evt.detail || []).forEach(addToast);
         });
     }
+
+    // ---------- Popovers (settings page's "more info" hints) ----------
+    // BS5 popovers need explicit init, unlike BS4's implicit jQuery plugin
+    // scan. Nothing on this page currently swaps in new popover triggers via
+    // htmx, so a single pass at load is enough.
+    document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
+        new bootstrap.Popover(el);
+    });
 })();
