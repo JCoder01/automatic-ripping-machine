@@ -83,7 +83,15 @@ ARG ARM_UID=1000
 ARG ARM_GID=1000
 
 # Copy over source code
+# --chown correctly covers everything COPY places inside /opt/arm/, but not
+# always the /opt/arm directory entry itself (BuildKit creates it as an
+# intermediate destination directory, which doesn't reliably inherit
+# --chown) - so arm_user_files_setup.sh's ownership check on /opt/arm
+# itself was seeing root even when everything under it was already correct.
+# Fix it explicitly; this is a single non-recursive chown, not a concern
+# for overlay2 copy-up the way the recursive one is.
 COPY --chown=${ARM_UID}:${ARM_GID} . /opt/arm/
+RUN chown ${ARM_UID}:${ARM_GID} /opt/arm
 
 # Our docker udev rule
 RUN ln -sv /opt/arm/setup/51-docker-arm.rules /lib/udev/rules.d/
