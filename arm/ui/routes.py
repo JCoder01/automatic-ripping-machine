@@ -21,8 +21,7 @@ from flask_login import LoginManager, login_required, \
 from sqlalchemy.exc import SQLAlchemyError
 
 import arm.ui.utils as ui_utils
-from arm.ui import app, db, constants
-from arm.models.job import Job
+from arm.ui import app, constants, json_api
 from arm.models.system_info import SystemInfo
 from arm.models.user import User
 import arm.config.config as cfg
@@ -68,13 +67,16 @@ def home():
 
     if os.path.isfile(cfg.arm_config['DBFILE']):
         try:
-            jobs = db.session.query(Job).filter(Job.status.notin_(['fail', 'success'])).all()
+            # Same shape/query the joblist polling fragment uses (json_api.feed_json,
+            # mode=joblist), so the initial page render and every poll after it agree -
+            # no more flash of an empty #joblist while the first poll is in flight.
+            joblist = json_api.get_x_jobs('joblist')
         except SQLAlchemyError as e:
             # db isn't setup
             app.logger.error(f"Error getting jobs from DB: {e}")
             return redirect(url_for('setup'))
     else:
-        jobs = {}
+        joblist = {'results': {}, 'arm_name': cfg.arm_config['ARM_NAME']}
 
     # Set authentication state for index
     authenticated = ui_utils.authenticated_state()
@@ -83,7 +85,8 @@ def home():
 
     return render_template("index.html",
                            authenticated=authenticated,
-                           jobs=jobs,
+                           results=joblist['results'],
+                           arm_name=joblist['arm_name'],
                            children=cfg.arm_config['ARM_CHILDREN'],
                            server=server, serverutil=serverutil,
                            arm_path=arm_path, media_path=media_path, stats=stats)

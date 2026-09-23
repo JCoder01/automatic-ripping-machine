@@ -423,7 +423,8 @@ def search(search_query):
             if key != "config":
                 search_results[i][str(key)] = str(value)
         i += 1
-    return {'success': True, 'mode': 'search', 'results': search_results}
+    return {'success': True, 'mode': 'search', 'results': search_results,
+           'arm_name': cfg.arm_config['ARM_NAME'], 'authenticated': authenticated_state()}
 
 
 def delete_job(job_id, mode):

@@ -32,6 +32,24 @@ route_jobs = Blueprint('route_jobs', __name__,
                        template_folder='templates',
                        static_folder='../static')
 
+# htmx sends "HX-Request: true" on every request it issues. For these modes,
+# feed_json() renders the same data as an HTML partial instead of JSON - see
+# the branch at the end of feed_json(). Everything else about the /json
+# dispatcher (and every mode not listed here) is unchanged.
+FRAGMENT_TEMPLATES = {
+    'joblist': '_joblist_cards.html',
+    'getfailed': '_joblist_cards.html',
+    'getsuccessful': '_joblist_cards.html',
+    'search': '_joblist_cards.html',
+    'full': '_logfile.html',
+    # abandon/fixperms don't re-render anything themselves (hx-swap="none" on
+    # their buttons) - feedback is the HX-Trigger toast below, and the next
+    # poll of the joblist naturally reflects the result (an abandoned job's
+    # status changes to "fail", dropping it from the active-jobs query).
+    'abandon': '_empty.html',
+    'fixperms': '_empty.html',
+}
+
 
 @route_jobs.route('/jobdetail')
 @login_required
@@ -396,6 +414,13 @@ def feed_json():
         args = [valid_data[x] for x in valid_modes[mode]['args']]
         return_json = valid_modes[mode]['funct'](*args)
     return_json['notes'] = json_api.get_notifications()
+
+    # htmx wants an HTML fragment, not JSON - render the same data with a partial
+    if request.headers.get('HX-Request') == 'true' and mode in FRAGMENT_TEMPLATES:
+        response = app.make_response(render_template(FRAGMENT_TEMPLATES[mode], **return_json))
+        if return_json['notes']:
+            response.headers['HX-Trigger'] = json.dumps({'showToast': return_json['notes']})
+        return response
 
     # return JSON data
     return app.response_class(response=json.dumps(return_json, indent=4, sort_keys=True),

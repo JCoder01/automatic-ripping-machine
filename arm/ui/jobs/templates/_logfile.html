@@ -1,0 +1,5 @@
+{# Logfile view swapped into the shared modal body (see database.html's "View logfile" action). #}
+<div class="bg-info card-header text-center mb-2">
+    <strong>{{ job_title }}</strong>
+</div>
+<pre class="text-white bg-secondary p-2 rounded"><code>{{ log|safe }}</code></pre>

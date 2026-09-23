@@ -1,0 +1,70 @@
+{#
+    Job card grid - shared partial for the homepage's Active Rips list, the
+    database page's search/getfailed/getsuccessful results, and (reused
+    unmodified) the initial server-rendered page load for all of the above.
+    Expects: results (dict of job dicts, as built by json_api.get_x_jobs/search),
+    authenticated (bool), arm_name (this server's configured name).
+#}
+{% for idx, job in results.items() %}
+    <div class="col" id="jobId{{ job.job_id }}">
+        <div class="card h-100">
+            <div class="card-header text-center">
+                <strong>{{ job.title_manual if job.title_manual and job.title_manual != "None" else job.title }} ({{ job.year }})</strong>
+            </div>
+            <div class="row g-0">
+                <div class="col-4">
+                    <a href="/jobdetail?job_id={{ job.job_id }}">
+                        {% if job.poster_url and job.poster_url not in ("None", "N/A") %}
+                            <img src="{{ job.poster_url }}" alt="poster" class="img-fluid img-thumbnail">
+                        {% else %}
+                            <img src="/static/img/{{ 'music.png' if job.video_type == 'Music' else 'none.png' }}"
+                                 alt="poster" class="img-fluid img-thumbnail">
+                        {% endif %}
+                    </a>
+                </div>
+                <div class="col-4">
+                    <div class="card-body px-2 py-1 small">
+                        <div><strong>Year:</strong> {{ job.year }}</div>
+                        <div><strong>Type:</strong> {{ job.video_type }}</div>
+                        <div><strong>Device:</strong> {{ job.devpath }}</div>
+                        <div><strong>Status:</strong>
+                            <img src="/static/img/{{ job.status }}.png" height="20" alt="{{ job.status }}" title="{{ job.status }}">
+                        </div>
+                        {% include "_job_progress.html" %}
+                    </div>
+                </div>
+                <div class="col-4">
+                    <div class="card-body px-2 py-1 small">
+                        <div><strong>Ripper:</strong> {{ arm_name|default("Local") }}</div>
+                        {% if job.config is mapping %}
+                            <div><strong>Rip Method:</strong> {{ job.config.RIPMETHOD }}</div>
+                            <div><strong>Main Feature:</strong> {{ job.config.MAINFEATURE }}</div>
+                            <div><strong>Min Length:</strong> {{ job.config.MINLENGTH }}</div>
+                            <div><strong>Max Length:</strong> {{ job.config.MAXLENGTH }}</div>
+                        {% endif %}
+                    </div>
+                    {% if authenticated %}
+                        <div class="card-body px-2 py-1 d-grid gap-1">
+                            <button type="button" class="btn btn-primary btn-sm"
+                                    hx-get="/json?mode=abandon&job={{ job.job_id }}"
+                                    hx-confirm="This job will be abandoned. You cannot set it back to active! Are you sure?"
+                                    data-confirm-title="Abandon this job?"
+                                    hx-swap="none">Abandon Job</button>
+                            <a class="btn btn-primary btn-sm" href="/logs?logfile={{ job.logfile }}&mode=full">View logfile</a>
+                            {% if job.video_type != "Music" %}
+                                <a class="btn btn-primary btn-sm" href="/titlesearch?job_id={{ job.job_id }}">Title Search</a>
+                                <a class="btn btn-primary btn-sm" href="/customTitle?job_id={{ job.job_id }}">Custom Title</a>
+                                <a class="btn btn-primary btn-sm" href="/changeparams?config_id={{ job.job_id }}">Edit Settings</a>
+                            {% endif %}
+                            <button type="button" class="btn btn-primary btn-sm"
+                                    hx-get="/json?mode=fixperms&job={{ job.job_id }}"
+                                    hx-confirm="This will try to set the chmod values from your arm.yaml. It wont always work, you may need to do this manually. Continue?"
+                                    data-confirm-title="Try to fix this job's folder permissions?"
+                                    hx-swap="none">Fix Permissions</button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endfor %}
