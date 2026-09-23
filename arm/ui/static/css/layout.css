@@ -1,0 +1,15 @@
+/* Sidebar shell layout - width/position only; theming comes from Bootstrap's
+   own bg-primary/text-white utilities so dark mode needs no overrides here. */
+.sidebar {
+    width: 260px;
+}
+
+@media (min-width: 768px) {
+    .sidebar {
+        position: sticky;
+        top: 0;
+        flex: 0 0 260px;
+        height: 100vh;
+        overflow-y: auto;
+    }
+}

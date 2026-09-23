@@ -4,18 +4,18 @@ function initTheme() {
     const isDark = localStorage.getItem("darkSwitch") === "dark";
     darkSwitch.checked = isDark;
     if (isDark) {
-        document.documentElement.setAttribute("data-theme", "dark");
+        document.documentElement.setAttribute("data-bs-theme", "dark");
     } else {
-        document.documentElement.removeAttribute("data-theme");
+        document.documentElement.removeAttribute("data-bs-theme");
     }
 }
 
 function resetTheme() {
     if (darkSwitch.checked) {
-        document.documentElement.setAttribute("data-theme", "dark");
+        document.documentElement.setAttribute("data-bs-theme", "dark");
         localStorage.setItem("darkSwitch", "dark");
     } else {
-        document.documentElement.removeAttribute("data-theme");
+        document.documentElement.removeAttribute("data-bs-theme");
         localStorage.removeItem("darkSwitch");
     }
 }

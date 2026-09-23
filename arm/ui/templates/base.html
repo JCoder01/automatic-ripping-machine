@@ -2,37 +2,57 @@
 <html lang="en">
     <!-- HTML Header -->
     {% include 'head.html' %}
-    <body style="padding: 70px 15px 50px;">
-        <!-- HTML Navigation -->
-        {% include 'nav.html' %}
-        <!-- Errors -->
-        <div id="content" class="h-100 content" style="width: 99%;padding-top: 51px;padding-left: 15px;">
-            {% with messages = get_flashed_messages(with_categories=true) %}
-                {% if messages %}
-                    {% for category, message in messages %}
-                        <div id="message1" class="alert alert-{{ category if category !=" message
-            " else 'info' }} text-center"
-                             role="alert">
-                            <h4 class="alert-heading">{{ message|safe }}</h4>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            {% endwith %}
-            {% block content %}{% endblock %}</div>
-        <!-- Footer -->
-        <div id="footer" class="container-fluid h-100">
-            <div class="row" style="height: 30px;"></div>
-            <div class="row h-100" style="height: 40px;">
-                <div class="col-sm-12 h-100">
+    <body>
+        <div class="d-md-flex">
+            <!-- HTML Navigation -->
+            {% include 'nav.html' %}
+            <!-- Main content -->
+            <main class="flex-grow-1 p-3 p-md-4" style="min-width: 0;">
+                <!-- Errors -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div id="message1" class="alert alert-{{ category if category !=" message
+                " else 'info' }} text-center"
+                                 role="alert">
+                                <h4 class="alert-heading">{{ message|safe }}</h4>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                <div id="content">
+                    {% block content %}{% endblock %}
+                </div>
+                <!-- Footer -->
+                <footer id="footer" class="mt-4">
                     {% block footer %}
-                        <p class="text-center h-100" style="margin-bottom: auto; margin-top: auto"> Automatic Ripping Machine.
+                        <p class="text-center text-muted"> Automatic Ripping Machine.
                             Find us on <a
                                     href="https://github.com/automatic-ripping-machine/automatic-ripping-machine">github</a>.
                         </p>
                     {% endblock %}
+                </footer>
+            </main>
+        </div>
+
+        <!-- Shared confirm dialog: app.js repoints htmx's hx-confirm into this modal -->
+        <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="confirmModalTitle">Please Confirm</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="confirmModalBody"></div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+                        <button type="button" class="btn btn-primary" id="confirmModalYes">Yes</button>
+                    </div>
                 </div>
             </div>
         </div>
+        <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
         {% block js %}
         {% endblock %}
     </body>

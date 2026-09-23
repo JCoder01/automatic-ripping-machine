@@ -1,58 +1,42 @@
 <!doctype html>
 <html lang="en">
-<head>
-    <!-- Required meta tags -->
-    <meta charset="utf-8">
-    <meta name="mobile-web-app-capable" content="yes"/>
-    <meta name="apple-mobile-web-app-capable" content="yes"/>
-    <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="viewport"
-          content="viewport-fit=cover, user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1">
-    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}" crossorigin="use-credentials"/>
-    <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}"/>
-    {% include 'head.html' %}
-</head>
-<body style="padding: 70px 15px 50px;">
+{% include 'head.html' %}
+<body>
 {% block nav %}
     <!-- TOAST -->
     <div aria-live="polite" aria-atomic="true">
-        <!-- Position it -->
-        <div id="toastHolder" style="position: fixed; top: 30%; right: 10%;z-index: 1000;">
-            <!-- TOASTS -->
-        </div>
+        <div id="toastHolder" class="position-fixed top-0 end-0 p-3" style="z-index: 1080;"></div>
     </div>
     <!-- Main -->
-    <div class="container h-100 mx-auto">
-        <nav class="navbar navbar-expand-md navbar-dark bg-primary justify-content-center fixed-top my-auto">
-            <a class="navbar-brand" href="index.html">
-                <img src="{{ url_for('static', filename='img/arm40nw.png') }}" width="114" height="40" alt="">
+    <nav class="navbar navbar-expand-md navbar-dark bg-primary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="/">
+                <img src="{{ url_for('static', filename='img/arm40nw.png') }}" width="114" height="40" alt="ARM">
             </a>
-            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent">
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent"
+                    aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <ul class="navbar-nav">
+                <ul class="navbar-nav me-auto">
                     <li id="navhome" class="nav-item">
-                        <a class="nav-link" href="index">Home</a>
+                        <a class="nav-link" href="/">Home</a>
                     </li>
                     <li id="navlogin" class="nav-item">
-                        <a class="nav-link" href="login">Login</a>
+                        <a class="nav-link" href="/login">Login</a>
                     </li>
                 </ul>
+                <div class="form-check form-switch text-white">
+                    <input type="checkbox" class="form-check-input" id="darkSwitch"/>
+                    <label class="form-check-label" for="darkSwitch">Dark Mode</label>
+                </div>
             </div>
-
-            <div class="custom-control custom-switch">
-                <input type="checkbox" class="custom-control-input" id="darkSwitch"/>
-                <label class="custom-control-label align-left" for="darkSwitch">Dark Mode</label>
-            </div>
-            <script src="{{ url_for('static', filename='js/dark-mode-switch.min.js') }}"></script>
-            <link rel="stylesheet" href="{{ url_for('static', filename='css/dark-mode.css') }}">
-
-        </nav>
-    </div>
+        </div>
+    </nav>
+    <script src="{{ url_for('static', filename='js/dark-mode-switch.js') }}"></script>
 {% endblock %}
-<!-- Errors -->
-<div id="content" class="h-100 content" style="width: 99%;padding-top: 51px;padding-left: 15px;">
+<main class="container-fluid p-3 p-md-4">
+    <!-- Errors -->
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
             {% for category, message in messages %}
@@ -64,22 +48,19 @@
             {% endfor %}
         {% endif %}
     {% endwith %}
-    {% block content %}{% endblock %}</div>
-<!-- Footer -->
-<div id="footer" class="container-fluid h-100">
-    <div class="row" style="height: 30px;"></div>
-    <div class="row h-100" style="height: 40px;">
-        <div class="col-sm-12 h-100">
-            {% block footer %}
-                <p class="text-center h-100" style="margin-bottom: auto; margin-top: auto"> Automatic Ripping Machine.
-                    Find us on <a
-                            href="https://github.com/automatic-ripping-machine/automatic-ripping-machine">github</a>.
-                </p>
-            {% endblock %}
-        </div>
+    <div id="content">
+        {% block content %}{% endblock %}
     </div>
-</div>
-</div>
+    <!-- Footer -->
+    <footer id="footer" class="mt-4">
+        {% block footer %}
+            <p class="text-center text-muted"> Automatic Ripping Machine.
+                Find us on <a
+                        href="https://github.com/automatic-ripping-machine/automatic-ripping-machine">github</a>.
+            </p>
+        {% endblock %}
+    </footer>
+</main>
 {% block js %}
 {% endblock %}
 </body>
