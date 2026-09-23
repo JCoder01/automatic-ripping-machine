@@ -3,9 +3,8 @@
 {% block content %}
 <h4>Loading log: {{ file }}...</h4>
 <div id="container">
-
     <div id="log">
-        <pre id="{{ file }}" ></pre>
+        <pre id="{{ file }}"></pre>
     </div>
 </div>
 {% endblock %}
@@ -13,6 +12,11 @@
 {% block js %}
 {{ super() }}
 <script>
+    // /logreader streams this log as one long-lived chunked response (it
+    // sleeps and yields new lines server-side rather than ever closing), so
+    // this opens a single connection and just keeps re-reading the growing
+    // xhr.responseText buffer - it must NOT be re-fetched on an interval,
+    // that would leak one open streaming connection per poll.
     const output = document.getElementById('{{ file }}');
 
     const xhr = new XMLHttpRequest();
@@ -21,7 +25,6 @@
     {% else %}
         xhr.open('GET', '/logreader?logfile={{ file }}&mode={{ mode }}&json=1');
     {% endif %}
-    xhr.open
     xhr.send();
 
     setInterval(function() {
@@ -30,7 +33,5 @@
             window.scrollTo(0, document.querySelector("#content").scrollHeight);
         {% endif %}
     }, 1000);
-
 </script>
 {% endblock %}
-

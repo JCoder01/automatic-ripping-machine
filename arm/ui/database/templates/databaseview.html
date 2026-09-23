@@ -1,214 +1,169 @@
 {% extends "base.html" %}
 
 {% block content %}
-<style>
-    #message3, #message1{
-        float: left;
-        position: fixed;
-        z-index: 1000000000;
-        top: 200px;
-        left: 200px;
-    }
-</style>
-    <div class="container-fluid h-100 mx-auto">
-        <!-- Header image -->
-        <div class="row">
-            <div class="col-sm-12  rounded text-center">
-                <img src="static/img/arm80.png" alt="Automatic Ripping Machine">
-                <p class="text-center">
-                    <strong>Welcome to your Automatic Ripping Machine<br></strong>
-                </p>
-            </div>
+    <div class="row">
+        <div class="col-12 rounded text-center">
+            <img src="/static/img/arm80.png" alt="Automatic Ripping Machine">
+            <p><strong>Welcome to your Automatic Ripping Machine</strong></p>
         </div>
-        <div class="row h-100 mx-auto align-items-center">
-            <div class="col-sm-12 mx-auto">
-                <p class="text-center">
-                    <h5 class="text-center"><strong>Database Entries</strong></h5>
-                </p>
-            </div>
+    </div>
+    <div class="row align-items-center mt-3">
+        <div class="col-12">
+            <h5 class="text-center"><strong>Database Entries</strong></h5>
         </div>
-        <!-- Modal -->
-        <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle"
-             aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="exampleModalLongTitle">Search Database</h5>
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">&times;</span>
-                        </button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="input-group mb-3">
-                            <div class="input-group-prepend">
-                                <span class="input-group-text" id="searchlabel">Search </span>
-                            </div>
-                            <input type="text" class="form-control" id="searchquery" aria-label="searchquery"
-                                   name="searchquery" placeholder="Search...." value="" aria-describedby="searchlabel">
-                            <div id="validationServer03Feedback" class="invalid-feedback">
-                                Search string too short.
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button id="save-no" type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-                        <button id="save-yes" type="button" class="btn btn-primary">Yes</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <!-- Messages -->
-        <div id="message1" class="alert alert-success d-none" role="alert">
-            <h4 class="alert-heading">Job was deleted successfully</h4>
-        </div>
-        <div id="message2" class="alert alert-danger text-center">
-            <strong>WARNING: </strong>There is no undo here!
-            <br>Be careful!
-        </div>
-        <div id="message3" class="alert alert-danger d-none" role="alert">
-            <h4 class="alert-heading">There was a problem with your request</h4>
-            <p>There was a problem with your request. Check the ARMui log for more details.</p>
-        </div>
-        <!-- Buttons -->
-        <div class="row d-flex justify-content-end">
-            <div class="p-4">
-                <button id="save-get-success" type="button" class="btn btn-secondary btn-success">Get all successful
-                    jobs
-                </button>
-                <button id="save-get-failed" type="button" class="btn btn-secondary btn-danger">Get all failed jobs
-                </button>
-                <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#exampleModal"
-                        data-type="search" data-href="json?mode=search&q=">Search Database
-                </button>
-            </div>
-        </div>
-
-        {% with pages=pages, page_name="route_database.view_database" %}
-            {% include "pagination.html" %}
-        {% endwith %}
-        <!-- All jobs -->
-        <div class="row">
-            <div class="col-md-12 mx-auto">
-                <div class="card-deck">
-                    {% for job in jobs %}
-                        <!-- Job {{ job.job_id }}-->
-                        <div class="col-md-4" id="jobId{{ job.job_id }}">
-                            <div class="card mb-3  mx-auto">
-                                <!-- Card Header -->
-                                <div class="card-header row no-gutters justify-content-center">
-                                    <strong>
-                                     {% if not job.title_manual %}
-                                        {{ job["title"] }} {{ '('+job['year']+')' if job["year"] is not none }}
-                                    {% else %}
-                                        {{ job["title_manual"] }} {{ '('+job['year']+')' if job["year"] is not none }}
-                                    {% endif %}
-                                    </strong>
-                                </div>
-                                <!-- Card Body -->
-                                <div class="row no-gutters">
-                                    <div class="col-lg-4">
-                                        {% if not job.poster_url or job.poster_url == "None" %}
-                                            {% if job.video_type == "Music" %}
-                                                <a href="jobdetail?job_id={{ job.job_id }}"><img src="static/img/music.png"
-                                                                                                width="240px"
-                                                                                                class="img-thumbnail"
-                                                                                                alt="No Poster Image"></a>
-                                            {% else %}
-                                                <a href="jobdetail?job_id={{ job.job_id }}"><img src="static/img/none.png"
-                                                                                                width="240px"
-                                                                                                class="img-thumbnail"
-                                                                                                alt="No Poster Image"></a>
-                                            {% endif %}
-                                        {% else %}
-                                            <a href="jobdetail?job_id={{ job.job_id }}"><img src="{{ job.poster_url }}"
-                                                                                             width="240px"
-                                                                                             class="img-thumbnail"
-                                                                                             alt="Poster image"></a>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-lg-4">
-                                        <div class="card-body px-1 py-1">
-                                            <strong>Type: </strong> {{ job.video_type }} <br>
-                                            {% if not job.title_manual %}
-                                                <strong>Year: </strong>({{ job["year"] }})<br>
-                                            {% else %}
-                                                <del><strong>Year:
-                                                </strong>{{ job["year_auto"] }}<br></del>
-                                                <strong>Year: </strong> {{ job["year"] }}<br>
-                                            {% endif %}
-                                            <strong>Device: </strong>{{ job.devpath }}<br>
-                                            <strong>Status: </strong><img id="status{{ job.job_id }}"
-                                                                          src="static/img/{{ job.status }}.png"
-                                                                          height="20px"
-                                                                          alt="{{ job.status }}"
-                                                                          title="{{ job.status }}"><br>
-                                            <strong>Start Date:</strong>{{ job.start_time.strftime(date_format) if
-                                    job.start_time is not none }}<br>
-                                            <strong>Start Time:</strong>{{ job.start_time.strftime("%H:%M:%S") if job.start_time
-                                    is not none }}<br>
-                                            <strong>Job Time:</strong>{{ " Ongoing" if job.job_length is none else job.job_length }}<br>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-4">
-                                        <div class="card-body px-1 py-1">
-                                            <div id="jobId{{ job.job_id }}_RIPMETHOD"><strong>Rip
-                                                Method: </strong>{{ job.config.RIPMETHOD }}</div>
-                                            <div id="jobId{{ job.job_id }}_MAINFEATURE"><strong>Main
-                                                Feature: </strong>{{ job.config.MAINFEATURE }}</div>
-                                            <div id="jobId{{ job.job_id }}_MINLENGTH"><strong>Min
-                                                Length: </strong>{{ job.config.MINLENGTH }}</div>
-                                            <div id="jobId{{ job.job_id }}_MAXLENGTH"><strong>Max
-                                                Length: </strong>{{ job.config.MAXLENGTH }}</div>
-                                        </div>
-                                        <div class="card-body px-2 py-1">
-                                            <div class="btn-group-vertical" role="group" aria-label="buttons">
-                                                <button type="button" class="btn btn-primary" data-toggle="modal"
-                                                        data-target="#exampleModal" data-type="abandon"
-                                                        data-jobid="{{ job.job_id }}"
-                                                        data-href="json?job={{ job.job_id }}&mode=abandon">Abandon Job
-                                                </button>
-                                                <button type="button" class="btn btn-primary" data-toggle="modal"
-                                                        data-target="#exampleModal" data-type="delete"
-                                                        data-jobid="{{ job.job_id }}"
-                                                        data-href="json?job={{ job.job_id }}&mode=delete">Delete Job
-                                                </button>
-                                                <button type="button" class="btn btn-primary" data-toggle="modal"
-                                                        data-target="#exampleModal" data-type="log"
-                                                        data-jobid="{{ job.job_id }}"
-                                                        data-href="json?logfile={{ job.logfile }}&mode=full&job={{ job.job_id }}">
-                                                    View Logfile
-                                                </button>
-                                                <button type="button" class="btn btn-primary" data-toggle="modal"
-                                                        data-target="#exampleModal" data-type="fixperms"
-                                                        data-jobid="{{ job.job_id }}"
-                                                        data-href="json?mode=fixperms&job={{ job.job_id }}">Fix
-                                                    Permissions
-                                                </button>
-
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
-        </div>
-
-        {% with pages=pages, page_name="route_database.view_database" %}
-            {% include "pagination.html" %}
-        {% endwith %}
-
     </div>
 
-{% endblock %}
-{% block footer %}{{ super() }}{% endblock %}
-{% block js %}
-    {{ super() }}
+    <!-- Search modal -->
+    <div class="modal fade" id="searchModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Search Database</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group">
+                        <span class="input-group-text" id="searchlabel">Search</span>
+                        <input type="text" class="form-control" id="searchquery" name="q" minlength="3" required
+                               placeholder="Search...." aria-describedby="searchlabel">
+                    </div>
+                    <div class="form-text">At least 3 characters.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal"
+                            hx-get="/json?mode=search" hx-include="#searchquery"
+                            hx-target="#joblist" hx-swap="innerHTML">Search</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <script type="application/javascript">activeTab("databaseview");</script>
-    <script type="application/javascript" src="static/js/common.js"></script>
-    <script type="application/javascript" src="static/js/database.js"></script>
+    <!-- Logfile modal -->
+    <div class="modal fade" id="logModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Logfile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="logModalBody"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="alert alert-danger text-center">
+        <strong>WARNING: </strong>There is no undo here! Be careful!
+    </div>
+
+    <!-- Buttons -->
+    <div class="row d-flex justify-content-end">
+        <div class="p-2 col-auto">
+            <button type="button" class="btn btn-success"
+                    hx-get="/json?mode=getsuccessful" hx-target="#joblist" hx-swap="innerHTML">
+                Get all successful jobs
+            </button>
+            <button type="button" class="btn btn-danger"
+                    hx-get="/json?mode=getfailed" hx-target="#joblist" hx-swap="innerHTML">
+                Get all failed jobs
+            </button>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#searchModal">
+                Search Database
+            </button>
+        </div>
+    </div>
+
+    {% with pages=pages, page_name="route_database.view_database" %}
+        {% include "pagination.html" %}
+    {% endwith %}
+
+    <!-- All jobs -->
+    <div class="row row-cols-1 row-cols-md-3 g-3" id="joblist">
+        {% for job in jobs %}
+            <div class="col" id="jobId{{ job.job_id }}">
+                <div class="card h-100">
+                    <div class="card-header text-center">
+                        <strong>
+                            {% if not job.title_manual %}
+                                {{ job["title"] }} {{ '('+job['year']+')' if job["year"] is not none }}
+                            {% else %}
+                                {{ job["title_manual"] }} {{ '('+job['year']+')' if job["year"] is not none }}
+                            {% endif %}
+                        </strong>
+                    </div>
+                    <div class="row g-0">
+                        <div class="col-4">
+                            {% if not job.poster_url or job.poster_url == "None" %}
+                                {% if job.video_type == "Music" %}
+                                    <a href="/jobdetail?job_id={{ job.job_id }}"><img src="/static/img/music.png"
+                                                                                    class="img-fluid img-thumbnail"
+                                                                                    alt="No Poster Image"></a>
+                                {% else %}
+                                    <a href="/jobdetail?job_id={{ job.job_id }}"><img src="/static/img/none.png"
+                                                                                    class="img-fluid img-thumbnail"
+                                                                                    alt="No Poster Image"></a>
+                                {% endif %}
+                            {% else %}
+                                <a href="/jobdetail?job_id={{ job.job_id }}"><img src="{{ job.poster_url }}"
+                                                                                 class="img-fluid img-thumbnail"
+                                                                                 alt="Poster image"></a>
+                            {% endif %}
+                        </div>
+                        <div class="col-4">
+                            <div class="card-body px-2 py-1 small">
+                                <div><strong>Type:</strong> {{ job.video_type }}</div>
+                                {% if not job.title_manual %}
+                                    <div><strong>Year:</strong> {{ job["year"] }}</div>
+                                {% else %}
+                                    <div><del><strong>Year:</strong> {{ job["year_auto"] }}</del></div>
+                                    <div><strong>Year:</strong> {{ job["year"] }}</div>
+                                {% endif %}
+                                <div><strong>Device:</strong> {{ job.devpath }}</div>
+                                <div><strong>Status:</strong>
+                                    <img id="status{{ job.job_id }}" src="/static/img/{{ job.status }}.png"
+                                         height="20" alt="{{ job.status }}" title="{{ job.status }}">
+                                </div>
+                                <div><strong>Start Date:</strong> {{ job.start_time.strftime(date_format) if job.start_time is not none }}</div>
+                                <div><strong>Start Time:</strong> {{ job.start_time.strftime("%H:%M:%S") if job.start_time is not none }}</div>
+                                <div><strong>Job Time:</strong> {{ "Ongoing" if job.job_length is none else job.job_length }}</div>
+                            </div>
+                        </div>
+                        <div class="col-4">
+                            <div class="card-body px-2 py-1 small">
+                                <div><strong>Rip Method:</strong> {{ job.config.RIPMETHOD }}</div>
+                                <div><strong>Main Feature:</strong> {{ job.config.MAINFEATURE }}</div>
+                                <div><strong>Min Length:</strong> {{ job.config.MINLENGTH }}</div>
+                                <div><strong>Max Length:</strong> {{ job.config.MAXLENGTH }}</div>
+                            </div>
+                            <div class="card-body px-2 py-1 d-grid gap-1">
+                                <button type="button" class="btn btn-primary btn-sm"
+                                        hx-get="/json?job={{ job.job_id }}&mode=abandon"
+                                        hx-confirm="This item will be set to abandoned. You cannot set it back to active! Are you sure?"
+                                        data-confirm-title="Abandon this job?"
+                                        hx-target="#jobId{{ job.job_id }}" hx-swap="outerHTML swap:0.3s">Abandon Job</button>
+                                <button type="button" class="btn btn-primary btn-sm"
+                                        hx-get="/json?job={{ job.job_id }}&mode=delete"
+                                        hx-confirm="This item will be permanently deleted and cannot be recovered. Are you sure?"
+                                        data-confirm-title="Delete this job forever?"
+                                        hx-target="#jobId{{ job.job_id }}" hx-swap="outerHTML swap:0.3s">Delete Job</button>
+                                <button type="button" class="btn btn-primary btn-sm"
+                                        hx-get="/json?logfile={{ job.logfile }}&mode=full&job={{ job.job_id }}"
+                                        hx-target="#logModalBody" hx-swap="innerHTML"
+                                        data-bs-toggle="modal" data-bs-target="#logModal">View Logfile</button>
+                                <button type="button" class="btn btn-primary btn-sm"
+                                        hx-get="/json?mode=fixperms&job={{ job.job_id }}"
+                                        hx-confirm="This will try to set the chmod values from your arm.yaml. It wont always work, you may need to do this manually."
+                                        data-confirm-title="Try to fix this job's folder permissions?"
+                                        hx-swap="none">Fix Permissions</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    {% with pages=pages, page_name="route_database.view_database" %}
+        {% include "pagination.html" %}
+    {% endwith %}
 {% endblock %}

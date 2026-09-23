@@ -24,7 +24,7 @@ from werkzeug.routing import ValidationError
 
 import arm.ui.utils as ui_utils
 from arm.ui import app, db, constants, json_api
-from arm.models.job import Job, JobState
+from arm.models.job import Job, JobState, JOB_STATUS_FINISHED
 import arm.config.config as cfg
 from arm.ui.forms import TitleSearchForm, ChangeParamsForm, TrackFormDynamic
 
@@ -42,12 +42,18 @@ FRAGMENT_TEMPLATES = {
     'getsuccessful': '_joblist_cards.html',
     'search': '_joblist_cards.html',
     'full': '_logfile.html',
-    # abandon/fixperms don't re-render anything themselves (hx-swap="none" on
-    # their buttons) - feedback is the HX-Trigger toast below, and the next
-    # poll of the joblist naturally reflects the result (an abandoned job's
-    # status changes to "fail", dropping it from the active-jobs query).
+    # abandon/delete/fixperms don't re-render anything themselves - feedback is
+    # the HX-Trigger toast below. On the homepage/database page, abandon and
+    # delete buttons swap their own card out for this empty response (removing
+    # it); fixperms buttons use hx-swap="none" since the job isn't going away.
     'abandon': '_empty.html',
+    'delete': '_empty.html',
     'fixperms': '_empty.html',
+    'retry_transcode': '_empty.html',
+    # jobdetail.html's own progress section (json_api.get_job) - unlike the
+    # other modes its data lives under a `result` key, not spread at the top
+    # level, and it also gets a special HTTP status (see feed_json below).
+    'job': '_job_progress.html',
 }
 
 
@@ -417,7 +423,16 @@ def feed_json():
 
     # htmx wants an HTML fragment, not JSON - render the same data with a partial
     if request.headers.get('HX-Request') == 'true' and mode in FRAGMENT_TEMPLATES:
-        response = app.make_response(render_template(FRAGMENT_TEMPLATES[mode], **return_json))
+        context = return_json
+        status = 200
+        if mode == 'job':
+            job_result = return_json.get('result') or {}
+            context = {'job': job_result}
+            if job_result.get('status') in {s.value for s in JOB_STATUS_FINISHED}:
+                # Tell htmx to stop polling (its documented "stop this
+                # trigger" status code) once the job reaches a terminal state.
+                status = 286
+        response = app.make_response(render_template(FRAGMENT_TEMPLATES[mode], **context), status)
         if return_json['notes']:
             response.headers['HX-Trigger'] = json.dumps({'showToast': return_json['notes']})
         return response

@@ -1,7 +1,9 @@
 {#
-    Progress/stage/ETA block for one job, included inline inside a
-    _joblist_cards.html card. `job` is one entry from json_api.get_x_jobs()'s
-    `results` dict.
+    Progress/stage/ETA block for one job. Used two ways, both providing a
+    `job` dict shaped by json_api.py's build_job_result(): inline inside a
+    _joblist_cards.html card (one entry of get_x_jobs()'s `results` dict),
+    and as the swap target of jobdetail.html's own polling region (the
+    `result` of json_api.get_job(), see feed_json's mode == 'job' handling).
 #}
 {% set show_progress = (job.status == "transcoding" and job.stage and job.progress)
     or (job.status == "ripping" and job.stage and job.progress)

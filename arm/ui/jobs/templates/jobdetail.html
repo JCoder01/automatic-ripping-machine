@@ -10,9 +10,6 @@
             background-position: center;
             background-repeat: no-repeat;
             background-size: cover;
-            /*
-            background-size: 100% 100%;
-            */
             background-image: url({{ jobs.background }});
         }
 
@@ -20,9 +17,6 @@
             background-position: center;
             background-repeat: no-repeat;
             background-size: cover;
-            /*
-            background-size: 100% 100%;
-            */
             background-color: #fc3;
             border-radius: 50% !important;
         }
@@ -54,21 +48,14 @@
             margin-top: -50px !important;
         }
     </style>
-    <!--{{s}}
-<br>
-<br>
-{{jobs}}
--->
     <div class="container">
         <div class="row">
             <div class="col-sm-12">
                 <div class="table-responsive">
                     <div class="card{{ ' text-center' if jobs.background is none  else '' }}">
-                        <!-- GF Comment -->
                         <div class="card-header text-center">
                             <h4>{{ jobs.title }} - {{ jobs.video_type.capitalize() }} ({{ jobs.year }})</h4>
-                            <div class="ratings float-right mt-0">
-                                <!-- Proof that just because you CAN doesnt mean you should! -->
+                            <div class="ratings float-end mt-0">
                                 {% for ratings in s['Ratings'] %}
                                     <div class="
                                             {{ ratings['Source']|replace(' ', '-')|lower }}{{ '-rotten' if ratings['Source'] == 'Rotten Tomatoes' and ratings['Value']|replace('%','')| int < 60 else '' }}">
@@ -80,105 +67,97 @@
                         {% if not jobs.poster_url %}
                             <div class="card-header background-poster">
                                 {% if jobs.video_type == "Music" %}
-                                    <a id="posterClick" href="#">
-                                    <img src="static/img/music.png" alt="Not found" width="240px" class="img-thumbnail"></a>
+                                    <a id="posterClick" href="#" data-bs-toggle="collapse" data-bs-target="#plotInfo">
+                                    <img src="/static/img/music.png" alt="Not found" width="240px" class="img-thumbnail"></a>
                                 {% else %}
-                                    <a id="posterClick" href="#">
-                                    <img src="static/img/none.png" alt="Not found" width="240px" class="img-thumbnail"></a>
+                                    <a id="posterClick" href="#" data-bs-toggle="collapse" data-bs-target="#plotInfo">
+                                    <img src="/static/img/none.png" alt="Not found" width="240px" class="img-thumbnail"></a>
                                 {% endif %}
                                 {% if jobs.video_type != "Music" %}
-                                    <div class="btn-group float-right mt-2" role="group">
-                                        <a href="titlesearch?job_id={{ jobs.job_id }}" class="btn btn-primary">Title
+                                    <div class="btn-group float-end mt-2" role="group">
+                                        <a href="/titlesearch?job_id={{ jobs.job_id }}" class="btn btn-primary">Title
                                             Search</a>
-                                        <a href="customTitle?job_id={{ jobs.job_id }}" class="btn btn-primary">Custom
+                                        <a href="/customTitle?job_id={{ jobs.job_id }}" class="btn btn-primary">Custom
                                             Title</a>
-                                        <a id="plot" class="btn btn-primary">Plot</a>
+                                        <a id="plot" class="btn btn-primary" href="#" data-bs-toggle="collapse" data-bs-target="#plotInfo">Plot</a>
                                     </div>
                                 {% endif %}
                             </div>
                         {% else %}
                             <div class="card-header background-poster">
-                                <a id="posterClick" href="#">
+                                <a id="posterClick" href="#" data-bs-toggle="collapse" data-bs-target="#plotInfo">
                                     <img src="{{ jobs.poster_url }}" width="240px" class="img-thumbnail"
                                          alt="Movie Poster"></a>
                                 {% if jobs.video_type != "Music" %}
-                                    <div class="btn-group float-right mt-2" role="group">
-                                        <a href="titlesearch?job_id={{ jobs.job_id }}" class="btn btn-primary">Title
+                                    <div class="btn-group float-end mt-2" role="group">
+                                        <a href="/titlesearch?job_id={{ jobs.job_id }}" class="btn btn-primary">Title
                                             Search</a>
-                                        <a href="customTitle?job_id={{ jobs.job_id }}" class="btn btn-primary">Custom
+                                        <a href="/customTitle?job_id={{ jobs.job_id }}" class="btn btn-primary">Custom
                                             Title</a>
-                                        <a id="plot" class="btn btn-primary">Plot</a>
+                                        <a id="plot" class="btn btn-primary" href="#" data-bs-toggle="collapse" data-bs-target="#plotInfo">Plot</a>
                                     </div>
                                 {% endif %}
                             </div>
                         {% endif %}
-                        <div id="plotInfo" class="alert alert-info text-center" style="display: none;" role="alert">
-                            <h4 class="alert-heading">Plot for {{ jobs.title }}</h4>
-                            <hr>
-                            <p class="mb-0">{{ jobs.plot }}</p>
-                        </div>
-                        <div id="job_progress_section" class="card-body" style="display: none;">
-                            <div id="job_stage"><b>Stage: </b></div>
-                            <div id="job_progress">
-                                <div class="progress">
-                                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
-                                        aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" style="width: 0%">
-                                        <small class="justify-content-center d-flex position-absolute w-100" style="color: black; z-index: 2;">0%</small>
-                                    </div>
-                                </div>
+                        <div id="plotInfo" class="collapse">
+                            <div class="alert alert-info text-center m-3" role="alert">
+                                <h4 class="alert-heading">Plot for {{ jobs.title }}</h4>
+                                <hr>
+                                <p class="mb-0">{{ jobs.plot }}</p>
                             </div>
-                            <div id="job_eta"><b>ETA: </b></div>
-                            <div id="job_cur_fps"><b>CUR FPS: </b></div>
-                            <div id="job_avg_fps"><b>AVG FPS: </b></div>
                         </div>
+                        <div id="job_progress_section" class="card-body"
+                             hx-get="/json?mode=job&job={{ jobs.job_id }}"
+                             hx-trigger="load, every {{ armui_cfg['index_refresh'] }}ms"
+                             hx-swap="innerHTML"></div>
                         <div class="card-body">
                             <form method="POST" action="/jobdetailload?job_id={{ jobs.job_id }}">
                                 <table id="tracktable" class="table table-striped" aria-label="Tracks">
                                     <thead class="bg-secondary">
                                     <tr>
-                                        <th scope="col" style="text-align:left">Track #</th>
+                                        <th scope="col">Track #</th>
                                         {% if jobs.video_type == "Music" %}
-                                            <th scope="col" style="text-align:left">Track Name</th>
+                                            <th scope="col">Track Name</th>
                                         {% endif %}
-                                        <th scope="col" style="text-align:left">
+                                        <th scope="col">
                                             <button type="button" id="toggle-time-format" class="btn btn-primary" title="Click to toggle time format">
                                                 <span id="time-format-label">seconds</span>
                                             </button>
                                         </th>
-                                        <th scope="col" style="text-align:left">FPS</th>
-                                        <th scope="col" style="text-align:left">Aspect Ratio</th>
-                                        <th scope="col" style="text-align:left">Chapters</th>
-                                        <th scope="col" style="text-align:left">Size</th>
-                                        <th scope="col" style="text-align:left">Main Feature</th>
+                                        <th scope="col">FPS</th>
+                                        <th scope="col">Aspect Ratio</th>
+                                        <th scope="col">Chapters</th>
+                                        <th scope="col">Size</th>
+                                        <th scope="col">Main Feature</th>
                                         {% if jobs.video_type != "Music" %}
-                                            <th scope="col" style="text-align:left">Manual Process</th>
+                                            <th scope="col">Manual Process</th>
                                         {% endif %}
-                                        <th scope="col" style="text-align:left">Ripped</th>
+                                        <th scope="col">Ripped</th>
                                     </tr>
                                     </thead>
                                     <tbody>
                                     {% for track in tracks %}
                                         <tr>
-                                            <td style="text-align:left"><strong>{{ track.track_number }}</strong></td>
+                                            <td><strong>{{ track.track_number }}</strong></td>
                                             {% if jobs.video_type == "Music" %}
-                                                <td style="text-align:left"><strong>{{ track.filename}}</strong></td>
+                                                <td><strong>{{ track.filename}}</strong></td>
                                             {% endif %}
-                                            <td style="text-align:left">
+                                            <td>
                                                 <span class="length-seconds">{{ track.length }}{{ " (Milliseconds)" if jobs.video_type == "Music" else "" }}</span>
-                                                <span class="length-formatted" style="display:none;" data-seconds="{{ track.length }}"></span>
+                                                <span class="length-formatted d-none" data-seconds="{{ track.length }}"></span>
                                             </td>
-                                            <td style="text-align:left">{{ track.fps }}</td>
-                                            <td style="text-align:left">{{ track.aspect_ratio }}</td>
-                                            <td style="text-align:left">{{ track.chapters }}</td>
-                                            <td style="text-align:left">{{ "%.2f GB"|format(track.filesize / (1024**3)) if track.filesize else "Unknown" }}</td>
-                                            <td style="text-align:left">{{ track.main_feature }}</td>
+                                            <td>{{ track.fps }}</td>
+                                            <td>{{ track.aspect_ratio }}</td>
+                                            <td>{{ track.chapters }}</td>
+                                            <td>{{ "%.2f GB"|format(track.filesize / (1024**3)) if track.filesize else "Unknown" }}</td>
+                                            <td>{{ track.main_feature }}</td>
                                             {% if jobs.video_type != "Music" %}
-                                                <td style="text-align:center">
+                                                <td class="text-center">
                                                         {{ form.track_ref[loop.index0].checkbox }}
                                                         {{ form.track_ref[loop.index0].track_ref }}
                                                 </td>
                                             {% endif %}
-                                            <td style="text-align:left">{{ track.ripped }}</td>
+                                            <td>{{ track.ripped }}</td>
                                         </tr>
                                     {% endfor %}
                                     </tbody>
@@ -189,129 +168,134 @@
                                 {% endif %}
                             </form>
                             {% if manual_edit %}
-                                <form method="POST" action="/rescan_tracks?job_id={{ jobs.job_id }}" class="form-inline mt-2">
-                                    <label for="min_length" class="mr-2">Minimum track length to include (seconds):</label>
-                                    <input type="number" id="min_length" name="min_length" min="0"
-                                          value="{{ current_min_length }}" class="form-control form-control-sm d-inline-block"
-                                          style="width: 100px;">
-                                    <button type="submit" class="btn btn-secondary btn-sm ml-2">Rescan Disc</button>
+                                <form method="POST" action="/rescan_tracks?job_id={{ jobs.job_id }}"
+                                      class="row row-cols-auto g-2 align-items-center mt-2">
+                                    <label for="min_length" class="col-auto col-form-label">Minimum track length to include (seconds):</label>
+                                    <div class="col-auto">
+                                        <input type="number" id="min_length" name="min_length" min="0"
+                                              value="{{ current_min_length }}" class="form-control form-control-sm"
+                                              style="width: 100px;">
+                                    </div>
+                                    <div class="col-auto">
+                                        <button type="submit" class="btn btn-secondary btn-sm">Rescan Disc</button>
+                                    </div>
                                 </form>
                             {% endif %}
                             <hr>
                             <table id="jobtable" class="table table-striped" aria-label="Job details">
                                 <thead class="bg-secondary">
                                 <tr>
-                                    <th scope="col" style="text-align:left">Field</th>
-                                    <th scope="col" style="text-align:left">Value</th>
+                                    <th scope="col">Field</th>
+                                    <th scope="col">Value</th>
                                 </tr>
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    <td style="text-align:left"><strong>job_id</strong></td>
-                                    <td style="text-align:left">{{ jobs.job_id }}</td>
+                                    <td><strong>job_id</strong></td>
+                                    <td>{{ jobs.job_id }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>arm_version</strong></td>
-                                    <td style="text-align:left">{{ jobs.arm_version }}</td>
+                                    <td><strong>arm_version</strong></td>
+                                    <td>{{ jobs.arm_version }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>crc_id</strong></td>
-                                    <td style="text-align:left">{{ jobs.crc_id }}</td>
+                                    <td><strong>crc_id</strong></td>
+                                    <td>{{ jobs.crc_id }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>logfile</strong></td>
-                                    <td style="text-align:left"><a
-                                            href="logs?logfile={{ jobs.logfile }}&mode=full">{{ jobs.logfile }}</a>
+                                    <td><strong>logfile</strong></td>
+                                    <td><a
+                                            href="/logs?logfile={{ jobs.logfile }}&mode=full">{{ jobs.logfile }}</a>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>disc</strong></td>
-                                    <td style="text-align:left">{{ jobs.disc }}</td>
+                                    <td><strong>disc</strong></td>
+                                    <td>{{ jobs.disc }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>start_time</strong></td>
-                                    <td style="text-align:left">{{ jobs.start_time }}</td>
+                                    <td><strong>start_time</strong></td>
+                                    <td>{{ jobs.start_time }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>stop_time</strong></td>
-                                    <td style="text-align:left">{{ jobs.stop_time }}</td>
+                                    <td><strong>stop_time</strong></td>
+                                    <td>{{ jobs.stop_time }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>job_length</strong></td>
-                                    <td style="text-align:left">{{ jobs.job_length }}</td>
+                                    <td><strong>job_length</strong></td>
+                                    <td>{{ jobs.job_length }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>status</strong></td>
-                                    <td style="text-align:left">{{ jobs.status }}</td>
+                                    <td><strong>status</strong></td>
+                                    <td>{{ jobs.status }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>video_type</strong></td>
-                                    <td style="text-align:left">{{ jobs.video_type }}</td>
+                                    <td><strong>video_type</strong></td>
+                                    <td>{{ jobs.video_type }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>video_type_auto</strong></td>
-                                    <td style="text-align:left">{{ jobs.video_type_auto }}</td>
+                                    <td><strong>video_type_auto</strong></td>
+                                    <td>{{ jobs.video_type_auto }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>video_type_manual</strong></td>
-                                    <td style="text-align:left">{{ jobs.video_type_manual }}</td>
+                                    <td><strong>video_type_manual</strong></td>
+                                    <td>{{ jobs.video_type_manual }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>title</strong></td>
-                                    <td style="text-align:left">{{ jobs.title }}</td>
+                                    <td><strong>title</strong></td>
+                                    <td>{{ jobs.title }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>title_auto</strong></td>
-                                    <td style="text-align:left">{{ jobs.title_auto }}</td>
+                                    <td><strong>title_auto</strong></td>
+                                    <td>{{ jobs.title_auto }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>title_manual</strong></td>
-                                    <td style="text-align:left">{{ jobs.title_manual }}</td>
+                                    <td><strong>title_manual</strong></td>
+                                    <td>{{ jobs.title_manual }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>year</strong></td>
-                                    <td style="text-align:left">{{ jobs.year }}</td>
+                                    <td><strong>year</strong></td>
+                                    <td>{{ jobs.year }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>year_auto</strong></td>
-                                    <td style="text-align:left">{{ jobs.year_auto }}</td>
+                                    <td><strong>year_auto</strong></td>
+                                    <td>{{ jobs.year_auto }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>year_manual</strong></td>
-                                    <td style="text-align:left">{{ jobs.year_manual }}</td>
+                                    <td><strong>year_manual</strong></td>
+                                    <td>{{ jobs.year_manual }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>imdb_id</strong></td>
-                                    <td style="text-align:left">{{ jobs.imdb_id }}</td>
+                                    <td><strong>imdb_id</strong></td>
+                                    <td>{{ jobs.imdb_id }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>imdb_id_auto</strong></td>
-                                    <td style="text-align:left">{{ jobs.imdb_id_auto }}</td>
+                                    <td><strong>imdb_id_auto</strong></td>
+                                    <td>{{ jobs.imdb_id_auto }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>imdb_id_manual</strong></td>
-                                    <td style="text-align:left">{{ jobs.imdb_id_manual }}</td>
+                                    <td><strong>imdb_id_manual</strong></td>
+                                    <td>{{ jobs.imdb_id_manual }}</td>
                                 </tr>
                                 {% if not jobs.poster_url %}
                                     <tr>
-                                        <td style="text-align:left"><strong>poster_url</strong></td>
-                                        <td style="text-align:left"><a href=""><img src="static/img/none.png"
+                                        <td><strong>poster_url</strong></td>
+                                        <td><a href=""><img src="/static/img/none.png"
                                                                                     alt="Not found"
                                                                                     title="static/img/none.png"
                                                                                     width=50></a><br/>None
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align:left"><strong>poster_url_auto</strong></td>
-                                        <td style="text-align:left"><a href=""><img src="static/img/none.png"
+                                        <td><strong>poster_url_auto</strong></td>
+                                        <td><a href=""><img src="/static/img/none.png"
                                                                                     alt="Not found"
                                                                                     title="static/img/none.png"
                                                                                     width=50></a><br/>None
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align:left"><strong>poster_url_manual</strong></td>
-                                        <td style="text-align:left"><a href=""><img src="static/img/none.png"
+                                        <td><strong>poster_url_manual</strong></td>
+                                        <td><a href=""><img src="/static/img/none.png"
                                                                                     alt="Not found"
                                                                                     title="static/img/none.png"
                                                                                     width=50> </a><br/>None
@@ -319,24 +303,24 @@
                                     </tr>
                                 {% else %}
                                     <tr>
-                                        <td style="text-align:left"><strong>poster_url</strong></td>
-                                        <td style="text-align:left"><a href="{{ jobs.poster_url }}"><img
+                                        <td><strong>poster_url</strong></td>
+                                        <td><a href="{{ jobs.poster_url }}"><img
                                                 alt="Movie Poster"
                                                 src="{{ jobs.poster_url }}" title="{{ jobs.poster_url }}"
                                                 width=50></a><br/>{{ jobs.poster_url }}
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align:left"><strong>poster_url_auto</strong></td>
-                                        <td style="text-align:left"><a href="{{ jobs.poster_url_auto }}"><img
+                                        <td><strong>poster_url_auto</strong></td>
+                                        <td><a href="{{ jobs.poster_url_auto }}"><img
                                                 alt="Movie Poster"
                                                 src="{{ jobs.poster_url_auto }}" title="{{ jobs.poster_url_auto }}"
                                                 width=50></a><br/>{{ jobs.poster_url_auto }}
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align:left"><strong>poster_url_manual</strong></td>
-                                        <td style="text-align:left"><a href="{{ jobs.poster_url_manual }}"><img
+                                        <td><strong>poster_url_manual</strong></td>
+                                        <td><a href="{{ jobs.poster_url_manual }}"><img
                                                 alt="Movie Poster"
                                                 src="{{ jobs.poster_url_manual }}" title="{{ jobs.poster_url_manual }}"
                                                 width=50> </a><br/>{{ jobs.poster_url_manual }}
@@ -344,69 +328,69 @@
                                     </tr>
                                 {% endif %}
                                 <tr>
-                                    <td style="text-align:left"><strong>devpath</strong></td>
-                                    <td style="text-align:left">{{ jobs.devpath }}</td>
+                                    <td><strong>devpath</strong></td>
+                                    <td>{{ jobs.devpath }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>mountpoint</strong></td>
-                                    <td style="text-align:left">{{ jobs.mountpoint }}</td>
+                                    <td><strong>mountpoint</strong></td>
+                                    <td>{{ jobs.mountpoint }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>hasnicetitle</strong></td>
-                                    <td style="text-align:left">{{ jobs.hasnicetitle }}</td>
+                                    <td><strong>hasnicetitle</strong></td>
+                                    <td>{{ jobs.hasnicetitle }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>errors</strong></td>
-                                    <td style="text-align:left">{{ jobs.errors }}</td>
+                                    <td><strong>errors</strong></td>
+                                    <td>{{ jobs.errors }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>disctype</strong></td>
-                                    <td style="text-align:left">{{ jobs.disctype }}</td>
+                                    <td><strong>disctype</strong></td>
+                                    <td>{{ jobs.disctype }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>label</strong></td>
-                                    <td style="text-align:left">{{ jobs.label }}</td>
+                                    <td><strong>label</strong></td>
+                                    <td>{{ jobs.label }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>ejected</strong></td>
-                                    <td style="text-align:left">{{ jobs.ejected }}</td>
+                                    <td><strong>ejected</strong></td>
+                                    <td>{{ jobs.ejected }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>pid</strong></td>
-                                    <td style="text-align:left">{{ jobs.pid }}</td>
+                                    <td><strong>pid</strong></td>
+                                    <td>{{ jobs.pid }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>pid hash</strong></td>
-                                    <td style="text-align:left">{{ jobs.pid_hash }}</td>
+                                    <td><strong>pid hash</strong></td>
+                                    <td>{{ jobs.pid_hash }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>path</strong></td>
-                                    <td style="text-align:left">{{ jobs.path }}</td>
+                                    <td><strong>path</strong></td>
+                                    <td>{{ jobs.path }}</td>
                                 </tr>
                                 <tr>
-                                    <td style="text-align:left"><strong>Config ID</strong></td>
-                                    <td style="text-align:left"> {{ jobs.config.CONFIG_ID }}</td>
+                                    <td><strong>Config ID</strong></td>
+                                    <td> {{ jobs.config.CONFIG_ID }}</td>
                                 </tr>
                                 {% if jobs.video_type != "Music" %}
                                     <tr>
-                                        <td style="text-align:left"><strong>HB_PRESET_DVD</strong></td>
-                                        <td style="text-align:left"> {{ jobs.config.HB_PRESET_DVD }}</td>
+                                        <td><strong>HB_PRESET_DVD</strong></td>
+                                        <td> {{ jobs.config.HB_PRESET_DVD }}</td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align:left"><strong>HB_ARGS_DVD</strong></td>
-                                        <td style="text-align:left"> {{ jobs.config.HB_ARGS_DVD }}</td>
+                                        <td><strong>HB_ARGS_DVD</strong></td>
+                                        <td> {{ jobs.config.HB_ARGS_DVD }}</td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align:left"><strong>HB_PRESET_BD</strong></td>
-                                        <td style="text-align:left">{{ jobs.config.HB_PRESET_BD }}</td>
+                                        <td><strong>HB_PRESET_BD</strong></td>
+                                        <td>{{ jobs.config.HB_PRESET_BD }}</td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align:left"><strong>HB_ARGS_BD</strong></td>
-                                        <td style="text-align:left">{{ jobs.config.HB_ARGS_BD }}</td>
+                                        <td><strong>HB_ARGS_BD</strong></td>
+                                        <td>{{ jobs.config.HB_ARGS_BD }}</td>
                                     </tr>
                                     <tr>
-                                        <td style="text-align:left"><strong>Drive Mode</strong></td>
-                                        <td style="text-align:left">
+                                        <td><strong>Drive Mode</strong></td>
+                                        <td>
                                             {% if jobs.manual_mode %}
                                                 Manual
                                             {% else %}
@@ -423,140 +407,58 @@
             </div>
         </div>
     </div>
-    <script type="application/javascript">
-        $(function () {
-            $("#plot").click(function () {
-                $("#plotInfo").slideToggle(1000);
-            });
-            $("#posterClick").click(function () {
-                $("#plotInfo").slideToggle(1000);
-            });
-
-            // Function to convert seconds to HH:MM:SS format
-            function secondsToHHMMSS(seconds) {
-                if (!seconds) return "00:00:00";
-                
-                // Check if the video type is Music (which stores duration in milliseconds)
-                const isMusic = "{{ jobs.video_type }}" === "Music";
-                let secondsValue = parseInt(seconds, 10);
-                
-                // Convert milliseconds to seconds for music tracks
-                if (isMusic) {
-                    secondsValue = Math.round(secondsValue / 1000);
-                }
-                
-                const hours = Math.floor(secondsValue / 3600);
-                const minutes = Math.floor((secondsValue % 3600) / 60);
-                const remainingSeconds = Math.floor(secondsValue % 60);
-                
-                // If it's a short track with no hours, just show MM:SS
-                if (hours === 0) {
-                    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-                }
-                
-                return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-            }
-
-            // Convert all length values to HH:MM:SS and store them
-            $('.length-formatted').each(function() {
-                const seconds = $(this).data('seconds');
-                $(this).text(secondsToHHMMSS(seconds));
-            });
-
-            // Handle time format toggle
-            let showFormatted = false;
-            $('#toggle-time-format').click(function() {
-                showFormatted = !showFormatted;
-                if (showFormatted) {
-                    $('.length-seconds').hide();
-                    $('.length-formatted').show();
-                    $('#time-format-label').text('HH:MM:SS');
-                } else {
-                    $('.length-seconds').show();
-                    $('.length-formatted').hide();
-                    $('#time-format-label').text('seconds');
-                }
-                
-                // Store preference in local storage
-                localStorage.setItem('arm_show_formatted_time', showFormatted);
-            });
-            
-            // Check if there's a saved preference
-            if (localStorage.getItem('arm_show_formatted_time') === 'true') {
-                showFormatted = true;
-                $('.length-seconds').hide();
-                $('.length-formatted').show();
-                $('#time-format-label').text('HH:MM:SS');
-            }
-        });
-
-        // Live progress bar - polls this job's own status instead of the dashboard's
-        // full joblist, since only one job's data is needed here.
-        $(function () {
-            const FINISHED_STATUSES = ["success", "fail", "transcode_failed"];
-            let pollTimer = null;
-
-            function jobIsActive(job) {
-                if (job.status === "transcoding") return true;
-                if (job.status === "ripping" && job.stage !== "" && job.progress) return true;
-                if (job.disctype === "music" && job.stage !== "") return true;
-                return false;
-            }
-
-            function updateJobProgress(job) {
-                const section = $("#job_progress_section");
-                if (!jobIsActive(job)) {
-                    section.hide();
-                    return;
-                }
-                section.show();
-                $("#job_stage").html(`<b>Stage: </b>${job.stage}`);
-                $("#job_eta").html(`<b>ETA: </b>${job.eta}`);
-
-                const bar = section.find(".progress-bar");
-                bar.css("width", `${job.progress_round}%`);
-                bar.attr("aria-valuenow", job.progress_round);
-                bar.find("small").text(`${job.progress}%`);
-
-                const curFps = $("#job_cur_fps");
-                if (job.cur_fps === undefined || job.cur_fps === "-1") {
-                    curFps.hide();
-                } else {
-                    curFps.show().html(`<b>CUR FPS: </b>${job.cur_fps}`);
-                }
-
-                const avgFps = $("#job_avg_fps");
-                if (job.avg_fps === undefined || job.avg_fps === "-1") {
-                    avgFps.hide();
-                } else {
-                    avgFps.show().html(`<b>AVG FPS: </b>${job.avg_fps}`);
-                }
-            }
-
-            function pollJobProgress() {
-                $.ajax({
-                    url: "/json?mode=job&job={{ jobs.job_id }}",
-                    type: "get",
-                    timeout: 2000,
-                    success: function (data) {
-                        if (!data.success || !data.result) {
-                            return;
-                        }
-                        updateJobProgress(data.result);
-                        if (FINISHED_STATUSES.includes(data.result.status)) {
-                            clearInterval(pollTimer);
-                        }
-                    }
-                });
-            }
-
-            pollJobProgress();
-            pollTimer = window.setInterval(pollJobProgress, {{ armui_cfg['index_refresh'] }});
-        });
-    </script>
 {% endblock %}
 {% block footer %}{{ super() }}{% endblock %}
 {% block js %}
     {{ super() }}
+    <script type="application/javascript">
+        document.addEventListener("DOMContentLoaded", function () {
+            function secondsToHHMMSS(seconds) {
+                if (!seconds) return "00:00:00";
 
+                const isMusic = "{{ jobs.video_type }}" === "Music";
+                let secondsValue = parseInt(seconds, 10);
+
+                if (isMusic) {
+                    secondsValue = Math.round(secondsValue / 1000);
+                }
+
+                const hours = Math.floor(secondsValue / 3600);
+                const minutes = Math.floor((secondsValue % 3600) / 60);
+                const remainingSeconds = Math.floor(secondsValue % 60);
+
+                if (hours === 0) {
+                    return `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+                }
+
+                return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+            }
+
+            document.querySelectorAll(".length-formatted").forEach(function (el) {
+                el.textContent = secondsToHHMMSS(el.dataset.seconds);
+            });
+
+            const toggleBtn = document.getElementById("toggle-time-format");
+            const timeFormatLabel = document.getElementById("time-format-label");
+            let showFormatted = localStorage.getItem("arm_show_formatted_time") === "true";
+
+            function applyTimeFormat() {
+                document.querySelectorAll(".length-seconds").forEach(function (el) {
+                    el.classList.toggle("d-none", showFormatted);
+                });
+                document.querySelectorAll(".length-formatted").forEach(function (el) {
+                    el.classList.toggle("d-none", !showFormatted);
+                });
+                timeFormatLabel.textContent = showFormatted ? "HH:MM:SS" : "seconds";
+            }
+
+            toggleBtn.addEventListener("click", function () {
+                showFormatted = !showFormatted;
+                localStorage.setItem("arm_show_formatted_time", showFormatted);
+                applyTimeFormat();
+            });
+
+            applyTimeFormat();
+        });
+    </script>
 {% endblock %}
