@@ -446,7 +446,7 @@ def feed_json():
                 status = 286
         else:
             context = return_json
-        response = app.make_response(render_template(FRAGMENT_TEMPLATES[mode], **context), status)
+        response = app.response_class(render_template(FRAGMENT_TEMPLATES[mode], **context), status=status)
         if return_json['notes']:
             response.headers['HX-Trigger'] = json.dumps({'showToast': return_json['notes']})
         return response
