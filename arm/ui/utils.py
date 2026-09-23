@@ -13,9 +13,9 @@ from pathlib import Path
 from sqlalchemy.exc import SQLAlchemyError
 from time import strftime, localtime, time, sleep
 
-import bcrypt
 import requests
 from werkzeug.routing import ValidationError
+from werkzeug.security import generate_password_hash
 from flask.logging import default_handler  # noqa: F401
 from flask_login import current_user
 
@@ -422,8 +422,7 @@ def setup_database():
         # UI Config
         # UI config is already set within the alembic migration file - 9cae4aa05dd7_create_settingsui_table.py
         # Create default user to save problems with ui and ripper having diff setups
-        hashed = bcrypt.gensalt(12)
-        default_user = User(email="admin", password=bcrypt.hashpw("password".encode('utf-8'), hashed), hashed=hashed)
+        default_user = User(email="admin", password=generate_password_hash("password"))
         app.logger.debug("DB Init - Admin user loaded")
         db.session.add(default_user)
         # Server config

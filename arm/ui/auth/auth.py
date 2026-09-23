@@ -8,7 +8,7 @@ Covers
 - update_password [GET, POST]
 """
 from sqlite3 import OperationalError
-import bcrypt
+from werkzeug.security import check_password_hash, generate_password_hash
 from flask import redirect, render_template, request, Blueprint, flash, app, session
 from flask_login import LoginManager, login_required, \
     current_user, login_user, logout_user  # noqa: F401
@@ -64,16 +64,12 @@ def login():
     form = SetupForm()
     if form.validate_on_submit():
         login_username = form.username.data.strip()
-        login_password = form.password.data.strip().encode('utf-8')
+        login_password = form.password.data.strip()
         # we know there is only ever 1 admin account, so we can pull it and check against it locally
         admin = User.query.filter_by().first()
         app.logger.debug("user= " + str(admin))
-        # our pass
-        password = admin.password
-        # hashed pass the user provided
-        login_hashed = bcrypt.hashpw(login_password, admin.hash)
 
-        if login_hashed == password and login_username == admin.email:
+        if check_password_hash(admin.password, login_password) and login_username == admin.email:
             login_user(admin)
             app.logger.debug("user was logged in - redirecting")
             return_redirect = redirect(constants.HOME_PAGE)
@@ -114,20 +110,15 @@ def update_password():
     if form.validate_on_submit():
         # Get form values
         username = form.username.data.strip()
-        new_password = form.new_password.data.strip().encode('utf-8')
-        old_password = form.old_password.data.strip().encode('utf-8')
+        new_password = form.new_password.data.strip()
+        old_password = form.old_password.data.strip()
 
-        # Get current password and dehash
+        # Get current password
         user = User.query.filter_by(email=username).first()
-        current_password = user.password
-        hashed = user.hash
-        login_hashed = bcrypt.hashpw(old_password, hashed)
 
         # If user entered correct password
-        if login_hashed == current_password:
-            hashed_password = bcrypt.hashpw(new_password, hashed)
-            user.password = hashed_password
-            user.hash = hashed
+        if check_password_hash(user.password, old_password):
+            user.password = generate_password_hash(new_password)
             try:
                 db.session.commit()
                 flash("Password successfully updated", "success")

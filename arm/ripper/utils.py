@@ -5,6 +5,7 @@ import os
 import logging
 import subprocess
 import shutil
+import socket
 import time
 import random
 import re
@@ -12,12 +13,10 @@ from logging import Logger
 from pathlib import Path, PurePath
 from math import ceil
 
-import bcrypt
 import requests
 import apprise
 import psutil
-
-from netifaces import interfaces, ifaddresses, AF_INET
+from werkzeug.security import generate_password_hash
 
 import arm.config.config as cfg
 from arm.ripper.ProcessHandler import arm_subprocess
@@ -33,7 +32,15 @@ NOTIFY_TITLE = "ARM notification"
 
 
 class RipperException(Exception):
-    pass
+    """
+    :param already_notified: True if the raiser already sent the user a specific,
+        accurate notify() about this - main.py's top-level handler then skips its
+        own generic "fatal error" notification instead of piling a second, more
+        confusing one on top of it.
+    """
+    def __init__(self, *args, already_notified: bool = False):
+        super().__init__(*args)
+        self.already_notified = already_notified
 
 
 def notify(job, title: str, body: str):
@@ -167,6 +174,22 @@ def convert_job_type(video_type):
     return type_sub_folder
 
 
+def min_length_for(job):
+    """
+    The minimum track length (in seconds) to consider ripping, based on the job's
+    identified video type - movies and series often have very different legitimate
+    minimums (e.g. a 22-minute cutoff would silently exclude a 5-minute kids' show
+    episode). Falls back to the general MINLENGTH when the type isn't known.
+    :param job: current job
+    :return: str minimum length in seconds
+    """
+    if job.video_type == "movie":
+        return job.config.MOVIE_MIN_LENGTH
+    if job.video_type == "series":
+        return job.config.SHOW_MIN_LENGTH
+    return job.config.MINLENGTH
+
+
 def fix_job_title(job):
     """
     Validate the job title remove/add job year as needed\n
@@ -194,7 +217,7 @@ def move_files(base_path, filename, job, is_main_feature=False):
     :param str filename: name of file to be moved\n
     :param job: instance of Job class\n
     :param bool is_main_feature: if current is main feature move to main dir
-    :return str: Full movie path
+    :return bool: True if the file was moved (or already at its destination), False if the move failed
     """
     video_title = fix_job_title(job)
     logging.debug(f"Arguments: {base_path} : {filename} : "
@@ -202,7 +225,7 @@ def move_files(base_path, filename, job, is_main_feature=False):
     # If filename is blank skip and return
     if filename == "":
         logging.info(f"{filename} is empty... Skipping")
-        return None
+        return True
 
     movie_path = job.path
     logging.info(f"Moving {job.video_type} {filename} to {movie_path}")
@@ -213,14 +236,13 @@ def move_files(base_path, filename, job, is_main_feature=False):
     if is_main_feature:
         movie_file = os.path.join(movie_path, video_title + "." + job.config.DEST_EXT)
         logging.info(f"Track is the Main Title.  Moving '{os.path.join(base_path, filename)}' to {movie_file}")
-        move_files_main(os.path.join(base_path, filename), movie_file, movie_path)
+        return move_files_main(os.path.join(base_path, filename), movie_file, movie_path)
     else:
         # Don't make the extra's path unless we need it
         make_dir(extras_path)
         logging.info(f"Moving '{os.path.join(base_path, filename)}' to {extras_path}")
         # This also handles series - But it doesn't use the extras folder
-        move_files_main(os.path.join(base_path, filename), os.path.join(extras_path, filename), extras_path)
-    return movie_path
+        return move_files_main(os.path.join(base_path, filename), os.path.join(extras_path, filename), extras_path)
 
 
 def _calculate_filename_similarity(expected_base, actual_base):
@@ -318,7 +340,7 @@ def move_files_main(old_file, new_file, base_path):
     :param str old_file: The file to be moved - must include full path
     :param str new_file: Final destination of file - must include full path
     :param str base_path: The base path of the new file - used for logging
-    :return: None
+    :return bool: True if the file ends up at new_file (moved or already there), False if the move failed
     """
     if not os.path.isfile(new_file):
         # Try to find the file, handling minor naming discrepancies
@@ -328,8 +350,10 @@ def move_files_main(old_file, new_file, base_path):
             shutil.move(actual_old_file, new_file)
         except Exception as error:
             logging.error(f"Unable to move '{actual_old_file}' to '{base_path}' - Error: {error}")
+            return False
     else:
         logging.info(f"File: {new_file} already exists.  Not moving.")
+    return True
 
 
 def move_movie_poster(final_directory, hb_out_path):
@@ -353,7 +377,8 @@ def scan_emby():
 
     if cfg.arm_config["EMBY_REFRESH"]:
         logging.info("Sending Emby library scan request")
-        url = f"http://{cfg.arm_config['EMBY_SERVER']}:{cfg.arm_config['EMBY_PORT']}/Library/Refresh?api_key={cfg.arm_config['EMBY_API_KEY']}"  # noqa: E501
+        scheme = "https" if cfg.arm_config.get("EMBY_SSL") else "http"
+        url = f"{scheme}://{cfg.arm_config['EMBY_SERVER']}:{cfg.arm_config['EMBY_PORT']}/Library/Refresh?api_key={cfg.arm_config['EMBY_API_KEY']}"  # noqa: E501
         try:
             req = requests.post(url)
             if req.status_code > 299:
@@ -565,9 +590,7 @@ def try_add_default_user():
     """
     try:
         username = "admin"
-        pass1 = "password".encode('utf-8')
-        hashed = bcrypt.gensalt(12)
-        database_adder(User(email=username, password=bcrypt.hashpw(pass1, hashed), hashed=hashed))
+        database_adder(User(email=username, password=generate_password_hash("password")))
         perm_file = Path(PurePath(cfg.arm_config['INSTALLPATH'], "installed"))
         write_permission_file = open(perm_file, "w")
         write_permission_file.write("boop!")
@@ -613,7 +636,7 @@ def put_track(job, t_no, seconds, aspect, fps, mainfeature, source, filename="",
         chapters=chapters,
         filesize=filesize
     )
-    job_track.ripped = (seconds > int(job.config.MINLENGTH))
+    job_track.ripped = (seconds > int(min_length_for(job)))
     database_adder(job_track)
 
 
@@ -731,12 +754,11 @@ def check_ip():
         return cfg.arm_config['WEBSERVER_IP']
     # autodetect host IP address
     ip_list = []
-    for interface in interfaces():
-        inet_links = ifaddresses(interface).get(AF_INET, [])
-        for link in inet_links:
-            ip_address = link['addr']
-            if ip_address != '127.0.0.1' and not ip_address.startswith('172'):
-                ip_list.append(ip_address)
+    for addrs in psutil.net_if_addrs().values():
+        for addr in addrs:
+            if addr.family == socket.AF_INET and addr.address != '127.0.0.1' \
+                    and not addr.address.startswith('172'):
+                ip_list.append(addr.address)
     if len(ip_list) > 0:
         return ip_list[0]
     return '127.0.0.1'
@@ -784,7 +806,9 @@ def duplicate_run_check(dev_path):
     logging.info(f"Job was started {job_time}min ago.")
     if (job_time) < 3:
         logging.info("Job was started less than 3min ago.")
-    raise RipperException(f"Job already running on {dev_path}")
+    # Some drives fire udev twice per disc insert, spawning a redundant second run - that's
+    # an internal race we've already handled, not something the user needs alerted about.
+    raise RipperException(f"Job already running on {dev_path}", already_notified=True)
 
 
 def save_disc_poster(final_directory, job):
@@ -829,7 +853,7 @@ def check_for_dupe_folder(have_dupes, hb_out_path, job):
             notify(job, NOTIFY_TITLE, f"ARM Detected a duplicate disc. For {job.title}. "
                                       f"Duplicate rips are disabled. "
                                       f"You can re-enable them from your config file. ")
-            raise RipperException("Duplicate rips are disabled")
+            raise RipperException("Duplicate rips are disabled", already_notified=True)
     logging.info(f"Final Output directory \"{hb_out_path}\"")
     return hb_out_path
 

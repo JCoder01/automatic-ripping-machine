@@ -55,11 +55,19 @@ SKIP_TRANSCODE: false
 VIDEOTYPE: "auto"
 
 # Minimum length of track for ARM rip (in seconds)
+# Used as a fallback when the video type could not be identified as a movie or series
 MINLENGTH: "600"
 
 # Maximum length of track for ARM rip (in seconds)
 # Use "99999" to indicate no maximum length
 MAXLENGTH: "99999"
+
+# Minimum length of track for ARM rip when the disc is identified as a movie (in seconds)
+MOVIE_MIN_LENGTH: "1320"
+
+# Minimum length of track for ARM rip when the disc is identified as a series (in seconds)
+# Lower than MOVIE_MIN_LENGTH to allow for short-episode shows
+SHOW_MIN_LENGTH: "300"
 
 # Wait for manual identification
 MANUAL_WAIT: true
@@ -231,7 +239,10 @@ HB_PRESET_DVD: "HQ 720p30 Surround"
 
 # Handbrake preset profile for Blurays
 # Execute "HandBrakeCLI -z" to see a list of all presets
-HB_PRESET_BD: "HQ 1080p30 Surround"
+# Note: presets cap resolution at what's in their name (e.g. "1080p" presets downscale
+# 4K UHD Blu-rays) - "up to 2160p" presets don't upscale regular Blu-rays, so this is
+# safe to use for both
+HB_PRESET_BD: "HQ 2160p60 4K HEVC Surround"
 
 # Extension of the final video file
 DEST_EXT: mkv
@@ -281,6 +292,9 @@ EMBY_REFRESH: false
 # Server can be ip address or domain name
 EMBY_SERVER: ""
 EMBY_PORT: "8096"
+
+# Set to true if your Emby/Jellyfin server requires HTTPS (e.g. reverse-proxied on port 443)
+EMBY_SSL: false
 
 # Emby authentication fluff parameters.  These can be anything.
 EMBY_CLIENT: "ARM"

@@ -60,14 +60,13 @@ def get_host():
     # Check if auto ip address 'x.x.x.x' or if inside docker - set internal ip from host and use WEBSERVER_IP for notify
     if host == 'x.x.x.x' or is_docker():
         # autodetect host IP address
-        from netifaces import interfaces, ifaddresses, AF_INET
+        import socket
+        import psutil
         ip_list = []
-        for interface in interfaces():
-            inet_links = ifaddresses(interface).get(AF_INET, [])
-            for link in inet_links:
-                ip = link['addr']
-                if ip != '127.0.0.1':
-                    ip_list.append(ip)
+        for addrs in psutil.net_if_addrs().values():
+            for addr in addrs:
+                if addr.family == socket.AF_INET and addr.address != '127.0.0.1':
+                    ip_list.append(addr.address)
         if len(ip_list) > 0:
             host = ip_list[0]
         else:

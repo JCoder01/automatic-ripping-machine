@@ -291,10 +291,10 @@ def ffmpeg_all(src_path, base_path, job):
         # Don't raise error if we past max titles, skip and continue till FFMPEG finishes
         if int(track.track_number) > job.no_of_titles:
             continue
-        if track.length < int(cfg.arm_config["MINLENGTH"]):
+        if track.length < int(utils.min_length_for(job)):
             # if track is too short then skip it
             logging.info(f"Track #{track.track_number} of {job.no_of_titles}. "
-                         f"Length ({track.length}) is less than minimum length ({cfg.arm_config['MINLENGTH']}). "
+                         f"Length ({track.length}) is less than minimum length ({utils.min_length_for(job)}). "
                          f"Skipping...")
         elif track.length > int(cfg.arm_config["MAXLENGTH"]):
             # If track is too long then skip it

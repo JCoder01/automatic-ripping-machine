@@ -41,8 +41,10 @@ def rip_visual_media(have_dupes, job, logfile, protection):
     # If dupes rips is disabled this might kill the run
     final_directory = utils.check_for_dupe_folder(have_dupes, final_directory, job)
 
-    # Update the job.path with the final directory
-    utils.database_updater({'path': final_directory}, job)
+    # Update the job.path with the final directory. Also persist transcode_out_path so a
+    # transcode-only retry (see retry_transcode.py) can reuse the exact same staging folder
+    # instead of calling check_for_dupe_folder again and risking a second, differently-suffixed one.
+    utils.database_updater({'path': final_directory, 'transcode_out_path': transcode_out_path}, job)
     # Save poster image from disc if enabled
     utils.save_disc_poster(final_directory, job)
 
@@ -67,9 +69,41 @@ def rip_visual_media(have_dupes, job, logfile, protection):
         logging.info("************* Ripping with MakeMKV completed *************")
         # point HB/FFMPEG to the path MakeMKV ripped to
         transcode_in_path = makemkv_out_path
+        # Persist where the raw files landed so a failed transcode can be retried from
+        # them later without needing the disc re-inserted (see retry_transcode.py)
+        utils.database_updater({'raw_path': makemkv_out_path}, job)
     # Begin transcoding section - only transcode if skip_transcode is false
-    start_transcode(job, logfile, transcode_in_path, transcode_out_path, protection)
+    try:
+        start_transcode(job, logfile, transcode_in_path, transcode_out_path, protection)
+    except Exception as transcode_error:
+        # Distinguish this from a generic failure: MakeMKV already succeeded and
+        # job.raw_path still has the ripped files, so the UI can offer a retry
+        # that skips straight back to transcoding instead of re-ripping the disc.
+        utils.database_updater(
+            {'status': JobState.TRANSCODE_FAILED.value, 'errors': str(transcode_error)}, job)
+        raise
 
+    finish_visual_media(job, transcode_in_path, transcode_out_path, final_directory,
+                        type_sub_folder, use_make_mkv, makemkv_out_path)
+
+
+def finish_visual_media(job, transcode_in_path, transcode_out_path, final_directory,
+                        type_sub_folder, use_make_mkv, makemkv_out_path=None):
+    """
+    Post-processing shared by a normal rip and a transcode-only retry: move the
+    transcoded files to their final location, clean up raw/staging files, and send
+    the completion notification.\n
+    :param job: Current job
+    :param transcode_in_path: Path HandBrake/FFMPEG read from (makemkv_out_path|/dev/srX)
+    :param transcode_out_path: Path HandBrake/FFMPEG put the transcoded files in
+    :param final_directory: job.path - the final media library destination
+    :param type_sub_folder: (movie|tv|unidentified) sub-folder
+    :param use_make_mkv: Was MakeMKV used to rip this job
+    :param makemkv_out_path: MakeMKV's raw output dir, if different from transcode_in_path
+    :return: None
+    """
+    if makemkv_out_path is None:
+        makemkv_out_path = transcode_in_path
     # --------------- POST PROCESSING ---------------
     # If ripped with MakeMKV remove the 'out' folder and set the raw as the output
     logging.debug(f"Transcode status: [{job.config.SKIP_TRANSCODE}] and MakeMKV Status: [{use_make_mkv}]")
@@ -88,15 +122,22 @@ def rip_visual_media(have_dupes, job, logfile, protection):
         utils.database_updater({'path': final_directory}, job)
 
     # Move to final folder
-    move_files_post(transcode_out_path, job)
+    files_moved = move_files_post(transcode_out_path, job)
     # Movie the movie poster if we have one - no longer needed, now handled by save_movie_poster
     utils.move_movie_poster(final_directory, transcode_out_path)
     # Scan Emby if arm.yaml requires it
     utils.scan_emby()
     # Set permissions if arm.yaml requires it
     utils.set_permissions(final_directory)
-    # If set in the arm.yaml remove the raw files
-    utils.delete_raw_files([transcode_in_path, transcode_out_path, makemkv_out_path])
+    # Only clean up the raw/staging files if every track actually made it to final_directory -
+    # otherwise a failed move (e.g. permission error on the destination) would silently delete
+    # the only copy of the ripped/transcoded media.
+    if files_moved:
+        utils.delete_raw_files([transcode_in_path, transcode_out_path, makemkv_out_path])
+    else:
+        error_msg = f"One or more files failed to move to '{final_directory}' - leaving raw/staging files in place"
+        logging.error(error_msg)
+        job.errors = error_msg
     # report errors if any
     notify_exit(job)
     logging.info("************* ARM processing complete *************")
@@ -192,23 +233,25 @@ def move_files_post(transcode_out_path, job):
     if movie check what source we got them from, for MakeMKV use skip_transcode_movie, so we can check filesize\n
     :param transcode_out_path: This should either be the RAW_PATH from MakeMKV, /dev/srX or TRANSCODE_PATH
     :param job: current job
-    :return: None
+    :return bool: True if every track was moved successfully, False if any move failed
     """
+    all_moved = True
     tracks = job.tracks.filter_by(ripped=True)  # .order_by(job.tracks.length.desc())
     if job.video_type == "series":
         for track in tracks:
-            utils.move_files(transcode_out_path, track.filename, job, False)
+            all_moved &= utils.move_files(transcode_out_path, track.filename, job, False)
     else:
         for track in tracks:
             if tracks.count() == 1:
-                utils.move_files(transcode_out_path, track.filename, job, True)
+                all_moved &= utils.move_files(transcode_out_path, track.filename, job, True)
             else:
                 # If source is MakeMKV we know the mainfeature will be wrong let skip_transcode_movie handle it
                 if track.source == "MakeMKV":
-                    skip_transcode_movie(os.listdir(transcode_out_path), job, transcode_out_path)
+                    all_moved &= skip_transcode_movie(os.listdir(transcode_out_path), job, transcode_out_path)
                     break
                 # If HandBrake was used we can pass track.main_feature
-                utils.move_files(transcode_out_path, track.filename, job, track.main_feature)
+                all_moved &= utils.move_files(transcode_out_path, track.filename, job, track.main_feature)
+    return all_moved
 
 
 def rip_with_mkv(current_job, protection=0):
@@ -245,8 +288,9 @@ def skip_transcode_movie(files, job, raw_path):
     :param files: os.listdir(RAW_PATH)
     :param job: Current job
     :param raw_path: RAW_PATH of ripped mkv files (mkvoutpath)
-    :return: None
+    :return bool: True if every file was moved successfully, False if any move failed
     """
+    all_moved = True
     logging.debug(f"Videotype: {job.video_type}")
     # if video_type is movie, then move the biggest title to media_dir
     # move the rest of the files to the extras' folder
@@ -263,7 +307,7 @@ def skip_transcode_movie(files, job, raw_path):
         # move others into extras folder
         if file == largest_file_name:
             # largest movie
-            utils.move_files(raw_path, file, job, True)
+            all_moved &= utils.move_files(raw_path, file, job, True)
         else:
             # If mainfeature is enabled - skip to the next file
             if job.config.MAINFEATURE:
@@ -271,6 +315,7 @@ def skip_transcode_movie(files, job, raw_path):
                 continue
             # Other/extras
             if str(job.config.EXTRAS_SUB).lower() != "none":
-                utils.move_files(raw_path, file, job, False)
+                all_moved &= utils.move_files(raw_path, file, job, False)
             else:
                 logging.info(f"Not moving extra: \"{file}\" - Sub folder is not set or named incorrectly")
+    return all_moved

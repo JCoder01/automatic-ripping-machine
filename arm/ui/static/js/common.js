@@ -176,6 +176,11 @@ function updateModal(modal, modalTitle = "", modalBody = "") {
             modalTitle = "Try to fix this jobs folder permissions ?";
             modalBody = "This will try to set the chmod values from your arm.yaml. It wont always work, you may need to do this manually";
             break;
+        case "retry_transcode":
+            modalTitle = "Retry transcoding this job ?";
+            modalBody = "This will retry transcoding using the files already ripped from the disc - no need to " +
+                        "re-insert it. Are you sure?";
+            break;
         case "search":
             modalTitle = "Search the database";
             modalBody = `<div class="input-group mb-3"><div class="input-group-prepend"><span class="input-group-text" id="searchlabel">Search </span></div>

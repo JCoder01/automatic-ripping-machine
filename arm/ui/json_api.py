@@ -4,6 +4,7 @@ Also used to connect to both omdb and tmdb
 """
 import os
 import subprocess
+import sys
 import re
 import html
 from collections import deque
@@ -32,6 +33,29 @@ def get_notifications():
     return notification
 
 
+def build_job_result(job):
+    """
+    Build the status/progress dict for a single job - shared by get_x_jobs() (a list of
+    these, for the dashboard's job cards) and get_job() (a single one, for a job's own
+    live progress bar)\n
+    :param job: the Job class instance
+    :return: dict
+    """
+    result = {}
+    job_log = os.path.join(cfg.arm_config['LOGPATH'], str(job.logfile))
+    process_logfile(job_log, job, result)
+    try:
+        result['config'] = job.config.get_d()
+    except AttributeError:
+        result['config'] = "config not found"
+        app.logger.debug("couldn't get config")
+
+    for key, value in job.get_d().items():
+        if key != "config":
+            result[str(key)] = str(value)
+    return result
+
+
 def get_x_jobs(job_status):
     """
     function for getting all Failed/Successful jobs \n
@@ -51,18 +75,7 @@ def get_x_jobs(job_status):
     job_results = {}
     i = 0
     for j in jobs:
-        job_results[i] = {}
-        job_log = os.path.join(cfg.arm_config['LOGPATH'], str(j.logfile))
-        process_logfile(job_log, j, job_results[i])
-        try:
-            job_results[i]['config'] = j.config.get_d()
-        except AttributeError:
-            job_results[i]['config'] = "config not found"
-            app.logger.debug("couldn't get config")
-
-        for key, value in j.get_d().items():
-            if key != "config":
-                job_results[i][str(key)] = str(value)
+        job_results[i] = build_job_result(j)
         i += 1
     if jobs:
         app.logger.debug("jobs  - we have " + str(len(job_results)) + " jobs")
@@ -76,6 +89,24 @@ def get_x_jobs(job_status):
             "results": job_results,
             "arm_name": cfg.arm_config['ARM_NAME'],
             "authenticated": authenticated}
+
+
+def get_job(job_id):
+    """
+    Get live status/progress info for a single job - used for jobdetail.html's own
+    progress bar, so it doesn't need to fetch every active job just to show one\n
+    :param job_id: the job id
+    :return: dict/json
+    """
+    job = Job.query.get(job_id)
+    if job is None:
+        return {"success": False, "mode": "job"}
+
+    return {"success": True,
+            "mode": "job",
+            "result": build_job_result(job),
+            "arm_name": cfg.arm_config['ARM_NAME'],
+            "authenticated": authenticated_state()}
 
 
 def process_logfile(logfile, job, job_results):
@@ -175,21 +206,54 @@ def process_makemkv_logfile(job, job_results):
 
     if job_stage_index is not None:
         try:
-            if job_batch_info.group(4) != job_stage_index.group(1):
+            # When MakeMKV rips the whole disc in a single pass (MAXLENGTH > 99998,
+            # ARM's default), no per-track BINF batch-info file is ever written -
+            # that only happens in the one-track-at-a-time path (process_single_tracks).
+            # job_batch_info is then None the first time (and every time) a PRGC line
+            # shows up here, so dereferencing it unconditionally raised
+            # "'NoneType' object has no attribute 'group'" before this file could ever
+            # be created, permanently breaking the stage display for that job. Bootstrap
+            # it with the same track=1 layout process_single_tracks uses on its first write.
+            #
+            # PRGC's own "id" field (group(2)) is MakeMKV's 0-based index of which title
+            # this stage message belongs to - use it directly for the track number instead
+            # of a stale value carried forward from a previous BINF line. The set of PRGC
+            # *codes* (group(1)) repeats identically for every title ("Analyzing seamless
+            # segments" then "Saving to MKV file" close together at the end of each one), so
+            # comparing codes alone to detect "did we move to a new title" falsely reads as
+            # "no change" whenever two different titles happen to share the same last-seen
+            # code - which stalled the display at "Track 1/2" forever once title 2 also hit
+            # "Saving to MKV file". Track transitions below are instead detected off the id.
+            current_track_id = job_stage_index.group(2)
+            current_track = str(int(current_track_id) + 1)
+            # job.no_of_titles is the disc's total title count, which is only the right
+            # denominator when MakeMKV is ripping the whole disc in one pass. When tracks
+            # were selected individually (manual override, or auto mode's length filter -
+            # see process_single_tracks), only those tracks get ripped, so the denominator
+            # should be how many were actually selected instead - otherwise e.g. picking 1
+            # of the disc's 2 titles still shows "Track 1/2" for the entire rip.
+            tracks_selected = job.tracks.filter_by(process=True).count()
+            total_tracks = (
+                str(tracks_selected) if tracks_selected
+                else str(job.no_of_titles) if job.no_of_titles
+                else current_track
+            )
+            last_track_id = job_batch_info.group(4) if job_batch_info is not None else None
+            if last_track_id != current_track_id:
                 app.logger.debug(f"Appending new batch position info for job {job.job_id}: "
                                  f"BINF:{int(time())},"
-                                 f"{job_batch_info.group(2)},"
-                                 f"{job_batch_info.group(3)},"
-                                 f"{job_stage_index.group(1)}"
+                                 f"{current_track},"
+                                 f"{total_tracks},"
+                                 f"{current_track_id}"
                                  )
                 with open(batch_log_path, 'a') as f:
                     f.write(f"\nBINF:{int(time())},"
-                            f"{job_batch_info.group(2)},"
-                            f"{job_batch_info.group(3)},"
-                            f"{job_stage_index.group(1)}"
+                            f"{current_track},"
+                            f"{total_tracks},"
+                            f"{current_track_id}"
                             )
             app.logger.debug(f"job_stage_index: {job_stage_index}")
-            current_index = f"Track {job_batch_info.group(2)}/{job_batch_info.group(3)}<br>{job_stage_index.group(3)}"
+            current_index = f"Track {current_track}/{total_tracks}<br>{job_stage_index.group(3)}"
             job.stage = job_results['stage'] = current_index
             db.session.commit()
         except Exception as error:
@@ -256,8 +320,13 @@ def process_handbrake_logfile(logfile, job, job_results):
 
     if job_status_index:
         try:
+            # group(2) is already the count of tracks actually selected for this rip
+            # (see process_single_tracks()'s "Processing track #X of Y" log line) - use
+            # it directly instead of job.no_of_titles, which is the disc's total title
+            # count and shows the wrong denominator whenever fewer tracks were selected.
             current_index = int(job_status_index.group(1))
-            job.stage = job_results['stage'] = f"{job.stage} - {current_index}/{job.no_of_titles}"
+            total_index = int(job_status_index.group(2))
+            job.stage = job_results['stage'] = f"{job.stage} - {current_index}/{total_index}"
         except Exception as error:
             app.logger.debug(f"Problem finding the current track {error}")
             job.stage = f"{job.stage} - %0%/%0%"
@@ -509,6 +578,59 @@ def abandon_job(job_id):
         notification = Notifications(title, message)
     db.session.add(notification)
     db.session.commit()
+    return json_return
+
+
+def retry_transcode(job_id):
+    """
+    json api - retry the transcode step for a job whose MakeMKV rip succeeded but
+    whose HandBrake/FFmpeg transcode subsequently failed\n
+    Launches arm/ripper/retry_transcode.py as its own process, the same way udev
+    launches arm/ripper/main.py for a fresh rip, since transcoding is a long-running
+    subprocess call that shouldn't run inside the UI's own process.\n
+    :param str job_id: the job id
+    :return: json/dict
+    """
+    json_return = {
+        'success': False,
+        'job': job_id,
+        'mode': 'retry_transcode'
+    }
+    if not job_id_validator(job_id):
+        notification = Notifications(f"Job: {job_id} isn't a valid job!",
+                                     f'Job with id: {job_id} doesnt match anything in the database')
+        db.session.add(notification)
+        db.session.commit()
+        return json_return
+
+    job = Job.query.get(int(job_id))
+    if job.status != JobState.TRANSCODE_FAILED.value:
+        json_return['error'] = "Job isn't in a retryable state"
+        return json_return
+    if not job.raw_path or not os.path.isdir(job.raw_path):
+        json_return['error'] = "Raw ripped files are no longer available for this job"
+        return json_return
+
+    script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          'ripper', 'retry_transcode.py')
+    try:
+        subprocess.Popen(
+            [sys.executable, script, '--job-id', str(job.job_id)],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as err:
+        app.logger.error(f"Error launching transcode retry for job {job_id}: {err}")
+        json_return['error'] = str(err)
+        return json_return
+
+    job.status = JobState.TRANSCODE_ACTIVE.value
+    notification = Notifications(f"Job: {job.title} transcode retry started",
+                                 'Retrying the transcode step using the previously ripped files.')
+    db.session.add(notification)
+    db.session.commit()
+    json_return['success'] = True
     return json_return
 
 

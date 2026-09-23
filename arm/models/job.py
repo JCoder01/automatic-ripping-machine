@@ -82,11 +82,16 @@ class JobState(str, enum.Enum):
     # Transcoding states
     TRANSCODE_ACTIVE = "transcoding"
     TRANSCODE_WAITING = "waiting_transcode"
+    TRANSCODE_FAILED = "transcode_failed"
+    """MakeMKV ripped successfully, but HandBrake/FFmpeg failed. Unlike a generic
+    FAILURE, the raw ripped files (job.raw_path) are known to still be on disk, so
+    the transcode step alone can be retried without re-ripping the disc."""
 
 
 JOB_STATUS_FINISHED = {
     JobState.SUCCESS,
     JobState.FAILURE,
+    JobState.TRANSCODE_FAILED,
 }
 JOB_STATUS_RIPPING = {
     JobState.AUDIO_RIPPING,
@@ -144,6 +149,14 @@ class Job(db.Model):
     disctype = db.Column(db.String(20))  # dvd/bluray/data/music/unknown
     label = db.Column(db.String(256))
     path = db.Column(db.String(256))
+    raw_path = db.Column(db.String(256))
+    """Directory MakeMKV ripped raw files into. Only set when MakeMKV was used to
+    rip the disc, so a failed transcode can be retried from these files without
+    needing the disc re-inserted."""
+    transcode_out_path = db.Column(db.String(256))
+    """Staging directory HandBrake/FFmpeg should transcode into, computed once at
+    rip time so a transcode retry writes to the same place instead of racing
+    check_for_dupe_folder into creating a second, differently-suffixed folder."""
     ejected = db.Column(db.Boolean)
     updated = db.Column(db.Boolean)
     pid = db.Column(db.Integer)

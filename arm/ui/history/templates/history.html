@@ -50,6 +50,28 @@
                         </div>
                     </div>
                     <br>
+                    <!-- Modal -->
+                    <div class="modal fade" id="exampleModal" tabindex="-1" role="dialog" aria-labelledby="exampleModalCenterTitle"
+                         aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title" id="exampleModalLongTitle">Confirm</h5>
+                                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                        <span aria-hidden="true">&times;</span>
+                                    </button>
+                                </div>
+                                <div class="modal-body">
+                                    <p><span class="ui-icon ui-icon-alert" style="margin:12px 12px 20px 0;"></span>
+                                        <span id="m-body"></span></p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button id="save-no" type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
+                                    <button id="save-yes" type="button" class="btn btn-primary">Yes</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     {% with pages=pages, page_name="route_history.history" %}
                         {% include "pagination.html" %}
                     {% endwith %}
@@ -64,6 +86,7 @@
                                 <th scope="col" style="cursor: pointer;">Duration</th>
                                 <th scope="col" style="cursor: pointer;">Status</th>
                                 <th scope="col" style="cursor: pointer;">Logfile</th>
+                                <th scope="col">Actions</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -75,11 +98,22 @@
                                 <td>{{ job.start_time.strftime(date_format) if job.start_time is not none }}</td>
                                 <td class="hidden">{{ job.start_time if job.start_time is not none }}</td>
                                 <td>{{ job.job_length }}</td>
-                                <td class="{{ job.status }}"><img src="static/img/{{ job.status }}.png" height="30px"
-                                                                  width="30px" alt="{{ job.status }}"
-                                                                  title="{{ job.status }}"></td>
+                                <td class="{{ job.status }}">
+                                    {% set status_icon = 'fail' if job.status == 'transcode_failed' else job.status %}
+                                    <img src="static/img/{{ status_icon }}.png" height="30px"
+                                        width="30px" alt="{{ job.status }}"
+                                        title="{{ job.status }}"></td>
                                 <td><a href="logs?logfile={{ job.logfile }}&mode=full">{{ job.logfile|truncate(50, True)
                                     if job.logfile is not none else 'Unknown logfile' }}</a></td>
+                                <td id="id{{ job.job_id }}">
+                                    {% if job.status == 'transcode_failed' %}
+                                    <button type="button" class="btn btn-primary btn-sm" data-toggle="modal"
+                                            data-target="#exampleModal" data-type="retry_transcode"
+                                            data-jobid="{{ job.job_id }}"
+                                            data-href="json?job={{ job.job_id }}&mode=retry_transcode">Retry Transcode
+                                    </button>
+                                    {% endif %}
+                                </td>
                             </tr>
                             {% endfor %}
                             </tbody>
@@ -97,11 +131,36 @@
     {% block js %}
     {{ super() }}
     <script src="{{ url_for('static', filename='js/jquery.tablesorter.js') }}"></script>
+    <script type="application/javascript" src="{{ url_for('static', filename='js/common.js') }}"></script>
 
     <script type="application/javascript">
+        let actionType = null;
+        let hrrref = "";
+
         $(document).ready(function () {
             $("table").tablesorter({});
 
+            $("#save-yes").bind("click", function () {
+                if (hrrref !== "") {
+                    $.get(hrrref, function (data) {
+                        if (data.success) {
+                            $(MODEL_ID).modal("toggle");
+                            location.reload();
+                        } else {
+                            $("#m-body").text(data.error || "That didn't work - check the logs.");
+                        }
+                    }, "json");
+                }
+            });
+            $("#save-no").bind("click", function () {
+                $(MODEL_ID).modal("toggle");
+            });
+            $(MODEL_ID).on("show.bs.modal", function (event) {
+                const button = $(event.relatedTarget);
+                actionType = button.data("type");
+                hrrref = button.data("href");
+                updateModal($(this));
+            });
         });
         activeTab("history");
     </script>
