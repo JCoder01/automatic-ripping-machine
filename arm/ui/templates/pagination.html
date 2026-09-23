@@ -1,9 +1,9 @@
 <!-- Pagination Links-->
 <div class="row">
     <div class="col">
-        <p class="text-left mt-3 d-block">Showing page {{ pages.page }} of {{ pages.pages }}</p>
+        <p class="text-start mt-3 d-block">Showing page {{ pages.page }} of {{ pages.pages }}</p>
     </div>
-    <div class="col text-right">
+    <div class="col text-end">
         <a href="{{ url_for(page_name, page=pages.prev_num) }}"
            class="btn btn-primary {% if pages.page == 1 %}disabled{% endif %}">&laquo;</a>
         <!-- Loop through the number of pages to display a link for each-->
