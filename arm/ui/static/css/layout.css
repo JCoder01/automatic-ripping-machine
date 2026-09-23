@@ -1,5 +1,38 @@
-/* Sidebar shell layout - width/position only; theming comes from Bootstrap's
-   own bg-primary/text-white utilities so dark mode needs no overrides here. */
+/* Brand color: a more muted blue than Bootstrap 5's stock, vivid #0d6efd -
+   close to ARM's old Bootswatch primary. Overriding --bs-primary alone only
+   reaches utilities that reference it directly (.bg-primary, .text-bg-primary,
+   .link-primary, .border-primary); .btn-primary/.nav-pills/.form-check-input
+   precompile their own color tokens rather than reading --bs-primary at
+   runtime, so those need their own overrides too. Same shade in both themes -
+   Bootstrap's dark mode only recalculates neutral/surface tokens, not brand
+   hue, so this isn't wrapped in a [data-bs-theme="dark"] block. */
+:root {
+    --bs-primary: #3f6a91;
+    --bs-primary-rgb: 63, 106, 145;
+}
+
+.btn-primary {
+    --bs-btn-bg: #3f6a91;
+    --bs-btn-border-color: #3f6a91;
+    --bs-btn-hover-bg: #355a7b;
+    --bs-btn-hover-border-color: #325474;
+    --bs-btn-active-bg: #325474;
+    --bs-btn-active-border-color: #2f4e6c;
+    --bs-btn-disabled-bg: #3f6a91;
+    --bs-btn-disabled-border-color: #3f6a91;
+    --bs-btn-focus-shadow-rgb: 92, 133, 165;
+}
+
+.nav-pills {
+    --bs-nav-pills-link-active-bg: #325474;
+}
+
+.form-check-input:checked {
+    background-color: #3f6a91;
+    border-color: #3f6a91;
+}
+
+/* Sidebar shell layout - width/position only. */
 .sidebar {
     width: 260px;
 }
