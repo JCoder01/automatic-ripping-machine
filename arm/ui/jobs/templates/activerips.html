@@ -3,37 +3,34 @@
 
 {% block nav %}{{ super() }}{% endblock %}
 
-{% block content %}  
+{% block content %}
 <div class="container">
-    <div class="row">
-        <div class="col-sm-2"></div>
-            <div class="col-sm-8" >
-                <div class="table-responsive">
-                    <table id="riptable" style="margin: 0 auto" class="table table-striped">
-                        <caption>Active Rips</caption>
-                        <thead class="tablesorterhead">    
-                            <tr style="margin: 0 auto">
-                                <th onclick="sortTable(0)">Title</th>
-                                <th onclick="sortTable(1)">Start Time</th>
-                                <th onclick="sortTable(2)">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                                        {% for job in jobs %}
-                            <tr>
-                                <td class="text-nowrap"><a href="titleupdate" title="Active Rips">{{ job.title }}</a></td>
-                                <td class="text-nowrap">{{ job.start_time }}</td>
-                                <td class="text-nowrap">{{ job.status }}</td>
-                                        {% endfor %}
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            <div class="col-sm-2"></div>
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="table-responsive">
+                <table id="riptable" class="table table-striped" data-sortable>
+                    <caption>Active Rips</caption>
+                    <thead class="table-dark">
+                        <tr>
+                            <th scope="col">Title</th>
+                            <th scope="col">Start Time</th>
+                            <th scope="col">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for job in jobs %}
+                        <tr>
+                            <td class="text-nowrap"><a href="/titleupdate" title="Active Rips">{{ job.title }}</a></td>
+                            <td class="text-nowrap">{{ job.start_time }}</td>
+                            <td class="text-nowrap">{{ job.status }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>
-
 {% endblock %}
 {% block footer %}{{ super() }}{% endblock %}
 {% block js %}{{ super() }}{% endblock %}

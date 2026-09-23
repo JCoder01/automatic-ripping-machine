@@ -50,10 +50,21 @@ FRAGMENT_TEMPLATES = {
     'delete': '_empty.html',
     'fixperms': '_empty.html',
     'retry_transcode': '_empty.html',
+    'send_item': '_send_item_card.html',
+    'change_job_params': '_empty.html',
     # jobdetail.html's own progress section (json_api.get_job) - unlike the
     # other modes its data lives under a `result` key, not spread at the top
     # level, and it also gets a special HTTP status (see feed_json below).
     'job': '_job_progress.html',
+}
+
+# send_item returns one flat job dict (see ui_utils.send_to_remote_db), not the
+# {results: {...}} shape the other modes share, so it needs its own variable
+# name in the template context instead of being spread with **return_json.
+# ('job' mode needs similar-but-different handling - see feed_json below,
+# since its data is nested one level deeper under 'result'.)
+FRAGMENT_CONTEXT_KEY = {
+    'send_item': 'job',
 }
 
 
@@ -423,15 +434,18 @@ def feed_json():
 
     # htmx wants an HTML fragment, not JSON - render the same data with a partial
     if request.headers.get('HX-Request') == 'true' and mode in FRAGMENT_TEMPLATES:
-        context = return_json
         status = 200
-        if mode == 'job':
+        if mode in FRAGMENT_CONTEXT_KEY:
+            context = {FRAGMENT_CONTEXT_KEY[mode]: return_json}
+        elif mode == 'job':
             job_result = return_json.get('result') or {}
             context = {'job': job_result}
             if job_result.get('status') in {s.value for s in JOB_STATUS_FINISHED}:
                 # Tell htmx to stop polling (its documented "stop this
                 # trigger" status code) once the job reaches a terminal state.
                 status = 286
+        else:
+            context = return_json
         response = app.make_response(render_template(FRAGMENT_TEMPLATES[mode], **context), status)
         if return_json['notes']:
             response.headers['HX-Trigger'] = json.dumps({'showToast': return_json['notes']})

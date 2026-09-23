@@ -2,128 +2,40 @@
 {% block title %}Parameter Changer{% endblock %}
 {% block nav %}{{ super() }}{% endblock %}
 {% block content %}
-    <style type="text/css">
-        div input {
-            display: block;
-            width: 100%;
-            height: initial;
-            padding: .375rem .75rem;
-            font-size: 1rem;
-            font-weight: 400;
-            line-height: 1.5;
-            color: #495057;
-            background-color: #fff;
-            background-clip: padding-box;
-            border: 1px solid #ced4da;
-            -webkit-border-top-right-radius: 3px;
-            -webkit-border-bottom-right-radius: 3px;
-            -moz-border-radius-topright: 3px;
-            -moz-border-radius-bottomright: 3px;
-            border-top-right-radius: 3px;
-            border-bottom-right-radius: 3px;
-            transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
-        }
-
-        div.input-group input, div.input-group select {
-            position: relative;
-            -ms-flex: 1 1 auto;
-            flex: 1 1 auto;
-            width: 1%;
-            min-width: 0;
-            margin-bottom: 0;
-            display: block;
-            padding: .375rem .75rem;
-            font-size: 1rem;
-            font-weight: 400;
-            line-height: 1.5;
-            color: #495057;
-            background-color: #fff;
-            background-clip: padding-box;
-            border: 1px solid #ced4da;
-            transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
-        }
-    </style>
     <div class="container justify-content-center">
         <div class="row justify-content-center" style="flex-wrap: nowrap">
-            <div class="col-7">
-                <form id="changeParams" name="changeParams" action="" method="get" novalidate>
+            <div class="col-lg-7">
+                <form id="changeParams" hx-get="/json" hx-swap="none">
                     {{ form.hidden_tag() }}
                     <div class="input-group mb-3 flex-nowrap">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">{{ form.RIPMETHOD.label }}</span>
-                        </div>
-                        {{ form.RIPMETHOD }}
+                        <span class="input-group-text">{{ form.RIPMETHOD.label }}</span>
+                        {{ form.RIPMETHOD(class="form-select") }}
                     </div>
 
                     <div class="input-group mb-3 flex-nowrap">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">{{ form.DISCTYPE.label }}</span>
-                        </div>
-                        {{ form.DISCTYPE }}
+                        <span class="input-group-text">{{ form.DISCTYPE.label }}</span>
+                        {{ form.DISCTYPE(class="form-select") }}
                     </div>
 
                     <div class="input-group mb-3 flex-nowrap">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">{{ form.MAINFEATURE.label }}</span>
-                        </div>
-                        {{ form.MAINFEATURE(class="switch") }}
+                        <span class="input-group-text">{{ form.MAINFEATURE.label }}</span>
+                        {{ form.MAINFEATURE(class="form-check-input mt-0 ms-2") }}
                     </div>
 
                     <div class="input-group mb-3 flex-nowrap">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">{{ form.MINLENGTH.label }}</span>
-                        </div>
-                        {{ form.MINLENGTH }}
-                        <div class="invalid-tooltip" id="MINLENGTH_INVALID">
-                            errors
-                        </div>
+                        <span class="input-group-text">{{ form.MINLENGTH.label }}</span>
+                        {{ form.MINLENGTH(class="form-control") }}
                     </div>
 
                     <div class="input-group mb-3 flex-nowrap">
-                        <div class="input-group-prepend">
-                            <span class="input-group-text">{{ form.MAXLENGTH.label }} </span>
-                        </div>
-                        {{ form.MAXLENGTH }}
-                        <div id="MAXLENGTH_INVALID" class="invalid-tooltip">
-                            Title can't be blank
-                        </div>
+                        <span class="input-group-text">{{ form.MAXLENGTH.label }} </span>
+                        {{ form.MAXLENGTH(class="form-control") }}
                     </div>
                     <input name="mode" value="change_job_params" hidden>
                     <input name="config_id" value="{{ config.CONFIG_ID }}" hidden>
-                    <button class="btn btn-info btn-lg btn-block" type="submit">Submit</button>
+                    <button class="btn btn-info btn-lg w-100" type="submit">Submit</button>
                 </form>
             </div>
         </div>
     </div>
-
-    {{ conf }}
-
-    <script type="application/javascript">
-        $(function () {
-            function sendSettings(formToSend, sendTo) {
-                $.ajax({
-                    type: 'GET',
-                    url: sendTo,
-                    data: formToSend.serialize()
-                }).done(function (data) {
-                    if (data.success === true) {
-                        var dt = new Date();
-                        var time = `${dt.getHours()}:${dt.getMinutes()}:${dt.getSeconds()}`;
-                        $('.toast-body').html(`Saved ${data.form} settings at ${time}`)
-                        $('.toast').toast('show');
-                    }
-                });
-            }
-
-            $("#changeParams").submit(function (e) {
-                e.preventDefault();
-                sendSettings($("#changeParams"), "/json");
-            });
-            {% for field, errors in form.errors.items() %}
-                $("[name='{{field}}']").addClass("is-invalid");
-                $("div#{{ field }}_INVALID").html("{{ errors }}");
-            {% endfor %}
-
-        });
-    </script>
 {% endblock %}

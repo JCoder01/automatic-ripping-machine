@@ -1,0 +1,14 @@
+{# One job's result from POST /json?mode=send_item, prepended into send_movies.html's results grid. #}
+<div class="col" id="jobId{{ job.job_id }}">
+    <div class="card h-100 {{ 'border-danger' if job.status == 'fail' else 'border-success' }}">
+        <div class="card-header text-center">
+            <strong>{{ job.title }} ({{ job.year }})</strong>
+        </div>
+        <div class="card-body px-2 py-1 small" id="jobId{{ job.job_id }}_progress_section">
+            <div><strong>Status:</strong> {{ job.status }}</div>
+            {% if job.error %}
+                <div class="text-danger"><strong>Failure Reason:</strong> {{ job.error }}</div>
+            {% endif %}
+        </div>
+    </div>
+</div>

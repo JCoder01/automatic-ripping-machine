@@ -1,69 +1,51 @@
 {% extends "base.html" %}
 
 {% block content %}
-<style>
-    .btn-group-vertical{
-        display: none!important;
-    }
-</style>
-<div class="container-fluid h-100 mx-auto">
-    <div class="row">
-        <div class="col-sm-12  rounded text-center">
-            <img src="static/img/arm80.png" alt="Automatic Ripping Machine">
-            <p class="text-center">
-                <strong>Welcome to your Automatic Ripping Machine<br></strong>
-            </p>
-        </div>
-    </div>
-
-    <div class="jumbotron mb-5">
-        <div class="row h-100 mx-auto align-items-center">
-            <div class="col-sm-12 mx-auto">
-                <h5 class="text-center"><strong>These are the movies we tried to send to the ARM API</strong></h5>
-            </div>
-        </div>
-        <div class="row">
-            <div class="loading-spinner">
-                <div class="d-flex justify-content-center">
-                    <div class="spinner-border" role="status"><span class="sr-only"></span></div>
-                    <div id="currentTotal"></div>
-                </div>
-            </div>
-            <div class="col-md-12 mx-auto">
-                <div class="card-deck">
-                </div>
-            </div>
-        </div>
+<div class="row">
+    <div class="col-12 rounded text-center">
+        <img src="/static/img/arm80.png" alt="Automatic Ripping Machine">
+        <p><strong>Welcome to your Automatic Ripping Machine</strong></p>
     </div>
 </div>
-<script type="application/javascript" src="static/js/common.js"></script>
+
+<div class="p-4 p-md-5 bg-body-tertiary rounded-3 mb-4">
+    <h5 class="text-center"><strong>These are the movies we tried to send to the ARM API</strong></h5>
+    <div id="loadingSpinner">
+        <div class="d-flex justify-content-center align-items-center gap-2">
+            <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+            <div id="currentTotal"></div>
+        </div>
+    </div>
+    <div class="row row-cols-1 row-cols-md-3 g-3 mt-2" id="sendResults"></div>
+</div>
+{% endblock %}
+{% block footer %}{{ super() }}{% endblock %}
+{% block js %}
+{{ super() }}
 <script type="text/javascript">
-    let currentJob = 1;
-    $(document).ready(function () {
-        const jobItems = {{ job_list }};
-        $.each(jobItems, function (index, jobId) {
-            $("#currentTotal").html("<h3>Sending Job Progress: 0/" + jobItems.length + "</h3>");
-            var jqxhr = $.get("/json", {mode: "send_item", job: jobId}, function (job) {
-                console.log(job);
-                $("#currentTotal").html("<h3>Sending Job Progress: " + currentJob + "/" + jobItems.length + "</h3>")
-                $(".card-deck").prepend(addJobItem(job))
-                if (job.error !== "") {
-                    $(`#jobId${job.job_id}`).addClass("alert-danger")
-                    $(`#jobId${job.job_id}_progress_section`).append("<strong>Failure Reason: </strong>" + job.error)
-                } else {
-                    $(`#jobId${job.job_id}`).addClass("alert-success")
-                }
-            })
-                .fail(function () {
-                    console.log("error");
-                })
-                .always(function () {
-                    ++currentJob;
-                    if (currentJob === jobItems.length) $(".loading-spinner").html("<h2 class='text-center'>Finished sending to API! Please check results below.</h2>")
-                        .addClass("alert-info").parent().removeClass("row")
-                });
-        })
+    document.addEventListener("DOMContentLoaded", async function () {
         activeTab("navsendmovies");
+
+        const jobItems = {{ job_list }};
+        const totalEl = document.getElementById("currentTotal");
+        const resultsEl = document.getElementById("sendResults");
+        totalEl.innerHTML = `<h3>Sending Job Progress: 0/${jobItems.length}</h3>`;
+
+        for (let i = 0; i < jobItems.length; i++) {
+            try {
+                const response = await fetch(`/json?mode=send_item&job=${jobItems[i]}`, {
+                    headers: {"HX-Request": "true"}
+                });
+                const html = await response.text();
+                resultsEl.insertAdjacentHTML("afterbegin", html);
+            } catch (error) {
+                console.error("Error sending job", jobItems[i], error);
+            }
+            totalEl.innerHTML = `<h3>Sending Job Progress: ${i + 1}/${jobItems.length}</h3>`;
+        }
+
+        document.getElementById("loadingSpinner").outerHTML =
+            '<h2 class="text-center alert alert-info">Finished sending to API! Please check results below.</h2>';
     });
 </script>
 {% endblock %}
