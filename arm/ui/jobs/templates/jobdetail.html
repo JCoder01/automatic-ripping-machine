@@ -111,76 +111,14 @@
                              hx-trigger="load, every {{ armui_cfg['index_refresh'] }}ms"
                              hx-swap="innerHTML"></div>
                         <div class="card-body">
-                            <form method="POST" action="/jobdetailload?job_id={{ jobs.job_id }}">
-                                <table id="tracktable" class="table table-striped" aria-label="Tracks">
-                                    <thead class="bg-secondary">
-                                    <tr>
-                                        <th scope="col">Track #</th>
-                                        {% if jobs.video_type == "Music" %}
-                                            <th scope="col">Track Name</th>
-                                        {% endif %}
-                                        <th scope="col">
-                                            <button type="button" id="toggle-time-format" class="btn btn-primary" title="Click to toggle time format">
-                                                <span id="time-format-label">seconds</span>
-                                            </button>
-                                        </th>
-                                        <th scope="col">FPS</th>
-                                        <th scope="col">Aspect Ratio</th>
-                                        <th scope="col">Chapters</th>
-                                        <th scope="col">Size</th>
-                                        <th scope="col">Main Feature</th>
-                                        {% if jobs.video_type != "Music" %}
-                                            <th scope="col">Manual Process</th>
-                                        {% endif %}
-                                        <th scope="col">Ripped</th>
-                                    </tr>
-                                    </thead>
-                                    <tbody>
-                                    {% for track in tracks %}
-                                        <tr>
-                                            <td><strong>{{ track.track_number }}</strong></td>
-                                            {% if jobs.video_type == "Music" %}
-                                                <td><strong>{{ track.filename}}</strong></td>
-                                            {% endif %}
-                                            <td>
-                                                <span class="length-seconds">{{ track.length }}{{ " (Milliseconds)" if jobs.video_type == "Music" else "" }}</span>
-                                                <span class="length-formatted d-none" data-seconds="{{ track.length }}"></span>
-                                            </td>
-                                            <td>{{ track.fps }}</td>
-                                            <td>{{ track.aspect_ratio }}</td>
-                                            <td>{{ track.chapters }}</td>
-                                            <td>{{ "%.2f GB"|format(track.filesize / (1024**3)) if track.filesize else "Unknown" }}</td>
-                                            <td>{{ track.main_feature }}</td>
-                                            {% if jobs.video_type != "Music" %}
-                                                <td class="text-center">
-                                                        {{ form.track_ref[loop.index0].checkbox }}
-                                                        {{ form.track_ref[loop.index0].track_ref }}
-                                                </td>
-                                            {% endif %}
-                                            <td>{{ track.ripped }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                </table>
-                                {% if manual_edit  %}
-                                    {{ form.hidden_tag() }}
-                                    <button type="submit" class="btn btn-primary btn-sm" name="submit">Update</button>
-                                {% endif %}
-                            </form>
-                            {% if manual_edit %}
-                                <form method="POST" action="/rescan_tracks?job_id={{ jobs.job_id }}"
-                                      class="row row-cols-auto g-2 align-items-center mt-2">
-                                    <label for="min_length" class="col-auto col-form-label">Minimum track length to include (seconds):</label>
-                                    <div class="col-auto">
-                                        <input type="number" id="min_length" name="min_length" min="0"
-                                              value="{{ current_min_length }}" class="form-control form-control-sm"
-                                              style="width: 100px;">
-                                    </div>
-                                    <div class="col-auto">
-                                        <button type="submit" class="btn btn-secondary btn-sm">Rescan Disc</button>
-                                    </div>
-                                </form>
-                            {% endif %}
+                            <div id="track_table_section"
+                                 {% if not tracks %}
+                                 hx-get="/jobdetail_tracks?job_id={{ jobs.job_id }}"
+                                 hx-trigger="load, every {{ armui_cfg['index_refresh'] }}ms"
+                                 hx-swap="innerHTML"
+                                 {% endif %}>
+                                {% include "_track_table.html" %}
+                            </div>
                             <hr>
                             <table id="jobtable" class="table table-striped" aria-label="Job details">
                                 <thead class="bg-secondary">
@@ -412,52 +350,58 @@
 {% block js %}
     {{ super() }}
     <script type="application/javascript">
-        document.addEventListener("DOMContentLoaded", function () {
-            function secondsToHHMMSS(seconds) {
-                if (!seconds) return "00:00:00";
+        // The track table (and its #toggle-time-format button) gets replaced
+        // wholesale whenever /jobdetail_tracks polls in a fresh copy (see
+        // track_table_section above), so this uses event delegation on
+        // document rather than binding to the button directly, and re-applies
+        // formatting via htmx:load - which htmx fires both for the initial
+        // page and after every swap - instead of a one-time DOMContentLoaded
+        // pass.
+        function secondsToHHMMSS(seconds) {
+            if (!seconds) return "00:00:00";
 
-                const isMusic = "{{ jobs.video_type }}" === "Music";
-                let secondsValue = parseInt(seconds, 10);
+            const isMusic = "{{ jobs.video_type }}" === "Music";
+            let secondsValue = parseInt(seconds, 10);
 
-                if (isMusic) {
-                    secondsValue = Math.round(secondsValue / 1000);
-                }
-
-                const hours = Math.floor(secondsValue / 3600);
-                const minutes = Math.floor((secondsValue % 3600) / 60);
-                const remainingSeconds = Math.floor(secondsValue % 60);
-
-                if (hours === 0) {
-                    return `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
-                }
-
-                return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+            if (isMusic) {
+                secondsValue = Math.round(secondsValue / 1000);
             }
 
+            const hours = Math.floor(secondsValue / 3600);
+            const minutes = Math.floor((secondsValue % 3600) / 60);
+            const remainingSeconds = Math.floor(secondsValue % 60);
+
+            if (hours === 0) {
+                return `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+            }
+
+            return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`;
+        }
+
+        function applyTimeFormat() {
+            const showFormatted = localStorage.getItem("arm_show_formatted_time") === "true";
             document.querySelectorAll(".length-formatted").forEach(function (el) {
                 el.textContent = secondsToHHMMSS(el.dataset.seconds);
+                el.classList.toggle("d-none", !showFormatted);
             });
-
-            const toggleBtn = document.getElementById("toggle-time-format");
+            document.querySelectorAll(".length-seconds").forEach(function (el) {
+                el.classList.toggle("d-none", showFormatted);
+            });
             const timeFormatLabel = document.getElementById("time-format-label");
-            let showFormatted = localStorage.getItem("arm_show_formatted_time") === "true";
-
-            function applyTimeFormat() {
-                document.querySelectorAll(".length-seconds").forEach(function (el) {
-                    el.classList.toggle("d-none", showFormatted);
-                });
-                document.querySelectorAll(".length-formatted").forEach(function (el) {
-                    el.classList.toggle("d-none", !showFormatted);
-                });
+            if (timeFormatLabel) {
                 timeFormatLabel.textContent = showFormatted ? "HH:MM:SS" : "seconds";
             }
+        }
 
-            toggleBtn.addEventListener("click", function () {
-                showFormatted = !showFormatted;
-                localStorage.setItem("arm_show_formatted_time", showFormatted);
-                applyTimeFormat();
-            });
+        document.body.addEventListener("htmx:load", applyTimeFormat);
+        applyTimeFormat();
 
+        document.addEventListener("click", function (event) {
+            if (!event.target.closest("#toggle-time-format")) {
+                return;
+            }
+            const showFormatted = localStorage.getItem("arm_show_formatted_time") === "true";
+            localStorage.setItem("arm_show_formatted_time", !showFormatted);
             applyTimeFormat();
         });
     </script>

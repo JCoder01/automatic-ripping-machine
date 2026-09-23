@@ -1,0 +1,78 @@
+{#
+    Track list + track-selection form for jobdetail.html. Split out so it can
+    be re-rendered by the /jobdetail_tracks polling region (see jobdetail.html)
+    once MakeMKV's disc scan has written Track rows for a job that had none
+    yet at page load - manual_edit can also flip true/false as that happens,
+    so it's re-evaluated here too, not just the track list itself.
+    Expects: jobs, tracks, form, manual_edit, current_min_length.
+#}
+<form method="POST" action="/jobdetailload?job_id={{ jobs.job_id }}">
+    <table id="tracktable" class="table table-striped" aria-label="Tracks">
+        <thead class="bg-secondary">
+        <tr>
+            <th scope="col">Track #</th>
+            {% if jobs.video_type == "Music" %}
+                <th scope="col">Track Name</th>
+            {% endif %}
+            <th scope="col">
+                <button type="button" id="toggle-time-format" class="btn btn-primary" title="Click to toggle time format">
+                    <span id="time-format-label">seconds</span>
+                </button>
+            </th>
+            <th scope="col">FPS</th>
+            <th scope="col">Aspect Ratio</th>
+            <th scope="col">Chapters</th>
+            <th scope="col">Size</th>
+            <th scope="col">Main Feature</th>
+            {% if jobs.video_type != "Music" %}
+                <th scope="col">Manual Process</th>
+            {% endif %}
+            <th scope="col">Ripped</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for track in tracks %}
+            <tr>
+                <td><strong>{{ track.track_number }}</strong></td>
+                {% if jobs.video_type == "Music" %}
+                    <td><strong>{{ track.filename}}</strong></td>
+                {% endif %}
+                <td>
+                    <span class="length-seconds">{{ track.length }}{{ " (Milliseconds)" if jobs.video_type == "Music" else "" }}</span>
+                    <span class="length-formatted d-none" data-seconds="{{ track.length }}"></span>
+                </td>
+                <td>{{ track.fps }}</td>
+                <td>{{ track.aspect_ratio }}</td>
+                <td>{{ track.chapters }}</td>
+                <td>{{ "%.2f GB"|format(track.filesize / (1024**3)) if track.filesize else "Unknown" }}</td>
+                <td>{{ track.main_feature }}</td>
+                {% if jobs.video_type != "Music" %}
+                    <td class="text-center">
+                            {{ form.track_ref[loop.index0].checkbox }}
+                            {{ form.track_ref[loop.index0].track_ref }}
+                    </td>
+                {% endif %}
+                <td>{{ track.ripped }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    {% if manual_edit  %}
+        {{ form.hidden_tag() }}
+        <button type="submit" class="btn btn-primary btn-sm" name="submit">Update</button>
+    {% endif %}
+</form>
+{% if manual_edit %}
+    <form method="POST" action="/rescan_tracks?job_id={{ jobs.job_id }}"
+          class="row row-cols-auto g-2 align-items-center mt-2">
+        <label for="min_length" class="col-auto col-form-label">Minimum track length to include (seconds):</label>
+        <div class="col-auto">
+            <input type="number" id="min_length" name="min_length" min="0"
+                  value="{{ current_min_length }}" class="form-control form-control-sm"
+                  style="width: 100px;">
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-secondary btn-sm">Rescan Disc</button>
+        </div>
+    </form>
+{% endif %}

@@ -68,29 +68,22 @@ FRAGMENT_CONTEXT_KEY = {
 }
 
 
-@route_jobs.route('/jobdetail')
-@login_required
-def jobdetail():
+def _build_track_form(job):
     """
-    Page for showing in-depth details about a job
-
-    Shows Job/Config/Track class details
-    displays them in a clear and easy to ready format
+    Shared by /jobdetail and /jobdetail_tracks: builds the dynamic per-track
+    WTForm and the manual_edit/current_min_length flags the track table
+    partial needs. Split out so the polling endpoint doesn't have to
+    duplicate this, and doesn't pay for /jobdetail's OMDB/TMDB lookup.
+    :return: (tracks, track_form, manual_edit, current_min_length)
     """
     manual_edit = False
-
-    # Initialise form
     track_form = TrackFormDynamic()
-
-    job_id = request.args.get('job_id')
-    if (job := Job.query.get(job_id)) is None:
-        raise ValueError('Job not found')
 
     # Check if a manual job, waiting for input and user has not provided input
     if job.manual_mode and job.status == JobState.MANUAL_WAIT_STARTED.value and not job.manual_start:
         manual_edit = True
 
-    # Get Job and Track data
+    # Get Track data
     tracks = job.tracks.all()
     track_form.track_ref.min_entries = len(tracks)
     app.logger.debug(f"Found [{len(tracks)}] tracks")
@@ -104,15 +97,33 @@ def jobdetail():
         for entry in track_form.track_ref.entries:
             entry.checkbox.render_kw = {'disabled': 'disabled'}
 
+    # Same movie-vs-series-vs-unknown selection rescan_tracks() uses to apply the override
+    min_length_field = {"movie": "MOVIE_MIN_LENGTH", "series": "SHOW_MIN_LENGTH"}.get(job.video_type, "MINLENGTH")
+    current_min_length = getattr(job.config, min_length_field)
+
+    return tracks, track_form, manual_edit, current_min_length
+
+
+@route_jobs.route('/jobdetail')
+@login_required
+def jobdetail():
+    """
+    Page for showing in-depth details about a job
+
+    Shows Job/Config/Track class details
+    displays them in a clear and easy to ready format
+    """
+    job_id = request.args.get('job_id')
+    if (job := Job.query.get(job_id)) is None:
+        raise ValueError('Job not found')
+
+    tracks, track_form, manual_edit, current_min_length = _build_track_form(job)
+
     search_results = ui_utils.metadata_selector("get_details", job.title, job.year, job.imdb_id)
 
     if search_results and 'Error' not in search_results:
         job.plot = search_results['Plot'] if 'Plot' in search_results else "There was a problem getting the plot"
         job.background = search_results['background_url'] if 'background_url' in search_results else None
-
-    # Same movie-vs-series-vs-unknown selection rescan_tracks() uses to apply the override
-    min_length_field = {"movie": "MOVIE_MIN_LENGTH", "series": "SHOW_MIN_LENGTH"}.get(job.video_type, "MINLENGTH")
-    current_min_length = getattr(job.config, min_length_field)
 
     return render_template('jobdetail.html',
                            jobs=job,
@@ -121,6 +132,34 @@ def jobdetail():
                            manual_edit=manual_edit,
                            current_min_length=current_min_length,
                            form=track_form)
+
+
+@route_jobs.route('/jobdetail_tracks')
+@login_required
+def jobdetail_tracks():
+    """
+    Polling target for jobdetail.html's track table (see _track_table.html):
+    re-renders the track list/selection form once MakeMKV's disc scan has
+    written Track rows for a job that had none yet when the page first
+    loaded. Stops polling (HTTP 286) once tracks show up, or once the job
+    reaches a terminal state without ever getting any (e.g. it failed before
+    a scan completed) - either way there's nothing left to wait for.
+    """
+    job_id = request.args.get('job_id')
+    if (job := Job.query.get(job_id)) is None:
+        raise ValueError('Job not found')
+
+    tracks, track_form, manual_edit, current_min_length = _build_track_form(job)
+
+    is_finished = job.status in {s.value for s in JOB_STATUS_FINISHED}
+    status = 286 if (tracks or is_finished) else 200
+    return app.response_class(render_template('_track_table.html',
+                                              jobs=job,
+                                              tracks=tracks,
+                                              manual_edit=manual_edit,
+                                              current_min_length=current_min_length,
+                                              form=track_form),
+                              status=status)
 
 
 @route_jobs.route('/rescan_tracks', methods=['POST'])
