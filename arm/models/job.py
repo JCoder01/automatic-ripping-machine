@@ -4,7 +4,6 @@ import os
 import psutil
 import pyudev
 import subprocess
-import time
 
 from datetime import datetime as dt
 from prettytable import PrettyTable
@@ -179,7 +178,13 @@ class Job(db.Model):
             self.video_type = cfg.arm_config['VIDEOTYPE']
         self.parse_udev()
         self.get_pid()
-        self.stage = str(round(time.time() * 100))
+        # Placeholder until the ripper's log-parsing code (process_makemkv_logfile
+        # et al, in json_api.py) sets a real stage message - previously
+        # str(round(time.time() * 100)), a raw timestamp*100 value with no
+        # relation to any actual stage, which briefly showed as a bare number
+        # like "179026500184" on the job card whenever polled before the first
+        # PRGC line appeared in the log.
+        self.stage = "Preparing"
         self.manual_start = False
         self.manual_mode = False
         self.has_track_99 = False
