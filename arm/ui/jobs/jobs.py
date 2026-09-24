@@ -37,7 +37,11 @@ route_jobs = Blueprint('route_jobs', __name__,
 # the branch at the end of feed_json(). Everything else about the /json
 # dispatcher (and every mode not listed here) is unchanged.
 FRAGMENT_TEMPLATES = {
-    'joblist': '_joblist_cards.html',
+    # joblist gets its own template (heading + grid together, not just the
+    # grid _joblist_cards.html the other three share) so the homepage's
+    # "Active Rips" heading appears/disappears in step with whether there
+    # are any, re-evaluated on every poll rather than only at page load.
+    'joblist': '_active_rips_section.html',
     'getfailed': '_joblist_cards.html',
     'getsuccessful': '_joblist_cards.html',
     'search': '_joblist_cards.html',

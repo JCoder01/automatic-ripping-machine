@@ -8,6 +8,17 @@
             {% include 'nav.html' %}
             <!-- Main content -->
             <main class="flex-grow-1 p-3 p-md-4" style="min-width: 0;">
+                <div class="d-flex justify-content-end align-items-center gap-2 mb-3">
+                    <span id="notificationview">{% include 'navnotify.html' %}</span>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="restartUi" title="Restart ARM UI">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                             stroke-linejoin="round">
+                            <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+                            <line x1="12" y1="2" x2="12" y2="12"></line>
+                        </svg>
+                    </button>
+                </div>
                 <!-- Errors -->
                 {% with messages = get_flashed_messages(with_categories=true) %}
                     {% if messages %}

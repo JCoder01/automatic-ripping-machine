@@ -16,7 +16,7 @@
             <a class="navbar-brand mx-auto" href="/">
                 <img src="{{ url_for('static', filename='img/arm40nw.png') }}" width="86" height="30" alt="ARM">
             </a>
-            <span id="notificationview" class="nav-item">{% include 'navnotify.html' %}</span>
+            <span style="width: 24px;"></span>
         </div>
     </nav>
 
@@ -98,19 +98,6 @@
             </ul>
 
             <div class="px-3 py-3 border-top border-light-subtle mt-3">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span id="notificationview" class="d-none d-md-inline-block">{% include 'navnotify.html' %}</span>
-                    <li id="restart" class="nav-item list-unstyled">
-                        <button type="button" class="btn btn-outline-light btn-sm" id="restartUi" title="Restart ARM UI">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                 fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                 stroke-linejoin="round">
-                                <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-                                <line x1="12" y1="2" x2="12" y2="12"></line>
-                            </svg>
-                        </button>
-                    </li>
-                </div>
                 <div class="form-check form-switch">
                     <input type="checkbox" class="form-check-input" id="darkSwitch"/>
                     <label class="form-check-label" for="darkSwitch">Dark Mode</label>

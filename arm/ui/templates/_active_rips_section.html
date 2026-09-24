@@ -1,0 +1,18 @@
+{#
+    Homepage's Active Rips heading + job grid, rendered together so the
+    heading correctly appears/disappears as jobs start/finish - it's the
+    swap target of index.html's joblist poll (mode=joblist), not just the
+    grid, so re-evaluating "any jobs?" happens on every poll instead of
+    only at initial page load.
+    Expects: results, authenticated, arm_name (same as _joblist_cards.html).
+#}
+{% if results %}
+    <div class="row">
+        <div class="col-12">
+            <h5 class="text-center"><strong>Active Rips</strong></h5>
+        </div>
+    </div>
+{% endif %}
+<div class="row row-cols-1 row-cols-lg-2 g-3">
+    {% include "_joblist_cards.html" %}
+</div>
