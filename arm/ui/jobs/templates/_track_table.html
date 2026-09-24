@@ -1,9 +1,9 @@
 {#
     Track list + track-selection form for jobdetail.html. Split out so it can
-    be re-rendered by the /jobdetail_tracks polling region (see jobdetail.html)
-    once MakeMKV's disc scan has written Track rows for a job that had none
-    yet at page load - manual_edit can also flip true/false as that happens,
-    so it's re-evaluated here too, not just the track list itself.
+    be re-rendered by the Refresh button's /jobdetail_tracks fetch (see
+    jobdetail.html) once MakeMKV's disc scan has written Track rows for a job
+    that had none yet at page load - manual_edit can also flip true/false as
+    that happens, so it's re-evaluated here too, not just the track list itself.
     Expects: jobs, tracks, form, manual_edit, current_min_length.
 #}
 <form method="POST" action="/jobdetailload?job_id={{ jobs.job_id }}">

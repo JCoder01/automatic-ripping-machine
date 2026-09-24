@@ -76,7 +76,7 @@ def _build_track_form(job):
     """
     Shared by /jobdetail and /jobdetail_tracks: builds the dynamic per-track
     WTForm and the manual_edit/current_min_length flags the track table
-    partial needs. Split out so the polling endpoint doesn't have to
+    partial needs. Split out so the refresh endpoint doesn't have to
     duplicate this, and doesn't pay for /jobdetail's OMDB/TMDB lookup.
     :return: (tracks, track_form, manual_edit, current_min_length)
     """
@@ -142,12 +142,10 @@ def jobdetail():
 @login_required
 def jobdetail_tracks():
     """
-    Polling target for jobdetail.html's track table (see _track_table.html):
-    re-renders the track list/selection form once MakeMKV's disc scan has
-    written Track rows for a job that had none yet when the page first
-    loaded. Stops polling (HTTP 286) once tracks show up, or once the job
-    reaches a terminal state without ever getting any (e.g. it failed before
-    a scan completed) - either way there's nothing left to wait for.
+    Refresh target for jobdetail.html's track table (see _track_table.html
+    and its Refresh button): re-renders the track list/selection form on
+    demand, e.g. once MakeMKV's disc scan has written Track rows for a job
+    that had none yet when the page first loaded.
     """
     job_id = request.args.get('job_id')
     if (job := Job.query.get(job_id)) is None:
@@ -155,15 +153,12 @@ def jobdetail_tracks():
 
     tracks, track_form, manual_edit, current_min_length = _build_track_form(job)
 
-    is_finished = job.status in {s.value for s in JOB_STATUS_FINISHED}
-    status = 286 if (tracks or is_finished) else 200
-    return app.response_class(render_template('_track_table.html',
-                                              jobs=job,
-                                              tracks=tracks,
-                                              manual_edit=manual_edit,
-                                              current_min_length=current_min_length,
-                                              form=track_form),
-                              status=status)
+    return render_template('_track_table.html',
+                           jobs=job,
+                           tracks=tracks,
+                           manual_edit=manual_edit,
+                           current_min_length=current_min_length,
+                           form=track_form)
 
 
 @route_jobs.route('/rescan_tracks', methods=['POST'])
