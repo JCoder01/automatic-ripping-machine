@@ -167,3 +167,7 @@
         {% include "pagination.html" %}
     {% endwith %}
 {% endblock %}
+{% block js %}
+    {{ super() }}
+    <script type="application/javascript">activeTab("database");</script>
+{% endblock %}

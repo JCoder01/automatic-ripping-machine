@@ -35,3 +35,7 @@
         </div>
     </div>
 {% endblock %}
+{% block js %}
+    {{ super() }}
+    <script type="application/javascript">activeTab("home");</script>
+{% endblock %}

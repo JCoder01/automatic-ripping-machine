@@ -75,7 +75,11 @@
 
     if (toastHolder) {
         document.body.addEventListener("showToast", function (evt) {
-            (evt.detail.notes || evt.detail || []).forEach(addToast);
+            // The HX-Trigger response header carries a plain JSON array (see
+            // feed_json() in arm/ui/jobs/jobs.py) - htmx only passes an object
+            // through as evt.detail unchanged, anything else (including an
+            // array) gets wrapped as {value: <that array>}.
+            (evt.detail.value || []).forEach(addToast);
         });
     }
 
