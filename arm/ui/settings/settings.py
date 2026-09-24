@@ -20,6 +20,7 @@ import json
 import re
 import subprocess
 from datetime import datetime
+from urllib.parse import urlparse
 import os
 
 import sqlalchemy
@@ -74,6 +75,18 @@ def mask_last(value, n=4):
 
 def is_read_only(path: os.PathLike) -> bool:
     return not os.access(path, os.W_OK)
+
+
+def redirect_back(fallback_endpoint):
+    """
+    Redirect to the page the request came from (e.g. the header's eject button,
+    usable from any page) instead of always landing on a specific page - falls
+    back to `fallback_endpoint` when there's no referrer, or it's off-site.
+    """
+    referrer = request.referrer
+    if referrer and urlparse(referrer).netloc == urlparse(request.host_url).netloc:
+        return redirect(referrer)
+    return redirect(url_for(fallback_endpoint))
 
 
 route_settings.add_app_template_filter(mask_last, name='mask_last')
@@ -400,17 +413,17 @@ def drive_eject(eject_id):
     except sqlalchemy.exc.NoResultFound as e:
         app.logger.error(f"Drive eject encountered an error: {e}")
         flash(f"Cannot find drive {eject_id} in database.", "error")
-        return redirect(url_for(REDIRECT_SETTINGS))
+        return redirect_back(REDIRECT_SETTINGS)
     # block for running jobs
     if drive.job_id_current:
         drive.tray_status()  # update tray status
         if not drive.open:  # allow closing
             flash(f"Job [{drive.job_id_current}] in progress. Cannot eject {eject_id}.", "error")
-            return redirect(url_for(REDIRECT_SETTINGS))
+            return redirect_back(REDIRECT_SETTINGS)
     # toggle open/close (with non-critical error)
     if (error := drive.eject(method="toggle")) is not None:
         flash(error, "error")
-    return redirect(url_for(REDIRECT_SETTINGS))
+    return redirect_back(REDIRECT_SETTINGS)
 
 
 @route_settings.route('/drive/remove/<remove_id>')
