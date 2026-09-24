@@ -1,164 +1,89 @@
 {% block sysinfo %}
-    <style>
-        .progress-bar {
-            color: white !important;
-        }
-    </style>
     <div class="d-flex flex-column gap-3">
-        <div class="card">
-            <div class="card-header text-center">
-                <strong>System</strong>
+        {% if server.name or server.description %}
+            <div class="small text-muted">
+                {{ server.name }}{{ ' — ' ~ server.description if server.description }}
             </div>
-            <ul class="list-group list-group-flush">
-                <li class="list-group-item">
-                    Name: {{ server.name }}
-                </li>
-                <li class="list-group-item">
-                    {{ server.description }}
-                </li>
-                <li class="list-group-item">
-                    CPU: {{ server.cpu }}
-                </li>
-                <li class="list-group-item">
-                    {% if serverutil.cpu_temp is not none %}
-                        <section class="{{ ' bg-danger text-white' if serverutil.cpu_temp > 70 }}">CPU
-                            Temp: {{ serverutil.cpu_temp }}&#176;C
-                        </section>
-                    {% else %}
-                        <section> Temp: not reported</section>
-                    {% endif %}
-                </li>
-                <li class="list-group-item">
-                    <h6 class="progress-label" style="float: left;margin-right: 1em;">Usage: </h6>
-                    <div class="progress">
-                        <div class="progress-bar{{ ' bg-danger' if serverutil.cpu_util > 80 }}"
-                             role="progressbar"
-                             style="width: {{ ' 10' if serverutil.cpu_util < 10 else serverutil.cpu_util }}%;"
-                             aria-valuenow="{{ serverutil.cpu_util }}" aria-valuemin="0" aria-valuemax="100">
-                            {{ serverutil.cpu_util }}%
-                        </div>
-                    </div>
-                </li>
-            </ul>
+        {% endif %}
+
+        <!-- CPU -->
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-baseline">
+                <span class="fw-semibold">CPU</span>
+                <span class="fw-bold">{{ serverutil.cpu_util }}%</span>
+            </div>
+            <div class="text-muted small text-truncate mb-2">
+                {{ server.cpu }}{% if serverutil.cpu_temp is not none %} · {{ serverutil.cpu_temp }}&#176;C{% endif %}
+            </div>
+            <div class="progress" style="height: 6px;" role="progressbar"
+                 aria-valuenow="{{ serverutil.cpu_util }}" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar{{ ' bg-danger' if serverutil.cpu_util > 80 }}"
+                     style="width: {{ ' 10' if serverutil.cpu_util < 10 else serverutil.cpu_util }}%;"></div>
+            </div>
         </div>
-        <div class="card">
-            <div class="card-header text-center">
-                <strong>System Memory</strong>
+
+        <!-- Memory -->
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-baseline">
+                <span class="fw-semibold">Memory</span>
+                <span class="fw-bold">{{ serverutil.memory_percent }}%</span>
             </div>
-            <ul class="list-group list-group-flush">
-                <li class="list-group-item">
-                    Total: {{ server.mem_total }} GB
-                    <br>Free: {{ serverutil.memory_free }} GB
-                    <br>Used: {{ serverutil.memory_used }} GB
-                </li>
-                <li class="list-group-item">
-                    <h6 class="progress-label" style="float: left;margin-right: 1em;">Usage: </h6>
-                    <div class="progress">
-                        <div class="progress-bar{{ ' bg-danger' if serverutil.memory_percent > 80 }}"
-                             role="progressbar"
-                             style="width: {{ serverutil.memory_percent }}%;"
-                             aria-valuenow="{{ serverutil.memory_percent }}" aria-valuemin="0"
-                             aria-valuemax="100">
-                            {{ serverutil.memory_percent }}%
-                        </div>
-                    </div>
-                </li>
-            </ul>
+            <div class="text-muted small mb-2">
+                {{ serverutil.memory_used }} GB of {{ server.mem_total }} GB used
+            </div>
+            <div class="progress" style="height: 6px;" role="progressbar"
+                 aria-valuenow="{{ serverutil.memory_percent }}" aria-valuemin="0" aria-valuemax="100">
+                <div class="progress-bar{{ ' bg-danger' if serverutil.memory_percent > 80 }}"
+                     style="width: {{ serverutil.memory_percent }}%;"></div>
+            </div>
         </div>
-        <div class="card">
-            <div class="card-header text-center">
-                <strong>Storage</strong>
+
+        <!-- Storage -->
+        <div class="card p-3">
+            <div class="fw-semibold">Storage</div>
+            <div class="text-muted small mb-2">
+                {% if serverutil.storage_completed_free != 0 %}
+                    {{ serverutil.storage_completed_free }} GB free
+                {% else %}
+                    Unable to get data
+                {% endif %}
             </div>
-            <ul class="list-group list-group-flush">
-                <li class="list-group-item">
-                    {% if server.storage_transcode_free != 0 %}
-                        <h6 class="progress-label" style="float: left;margin-right: 1em;">Transcode: </h6>
-                        <div class="progress">
-                            <div class="progress-bar{{ ' bg-danger' if serverutil.storage_transcode_percent > 80 }}"
-                                 role="progressbar"
-                                 style="width: {{ serverutil.storage_transcode_percent }}%;"
-                                 aria-valuenow="{{ serverutil.storage_transcode_percent }}"
-                                 aria-valuemin="0"
-                                 aria-valuemax="100">{{ serverutil.storage_transcode_percent }}%
-                            </div>
-                        </div>
-                        <br> Free Space: {{ serverutil.storage_transcode_free }} GB
-                    {% else %}
-                        Transcode: Unable to get data on path
-                    {% endif %}
-                    <br>Path: {{ arm_path }}
-                </li>
-                <li class="list-group-item">
-                    {% if serverutil.storage_completed_free != 0 %}
-                        <h6 class="progress-label" style="float: left;margin-right: 1em;">Completed: </h6>
-                        <div class="progress">
-                            <div class="progress-bar{{ ' bg-danger' if serverutil.storage_completed_percent > 80 }}"
-                                 role="progressbar"
-                                 style="width: {{ serverutil.storage_completed_percent }}%;"
-                                 aria-valuenow="{{ serverutil.storage_completed_percent }}"
-                                 aria-valuemin="0"
-                                 aria-valuemax="100">{{ serverutil.storage_completed_percent }}%
-                            </div>
-                        </div>
-                        <br> Free Space: {{ serverutil.storage_completed_free }} GB
-                    {% else %}
-                        Completed: Unable to get data on path
-                    {% endif %}
-                    <br>Path: {{ media_path }}
-                </li>
-            </ul>
+            <div class="d-flex justify-content-between align-items-center small py-1 border-top">
+                <span class="text-muted">Transcode</span>
+                {% if server.storage_transcode_free != 0 %}
+                    <span class="text-truncate ms-2" style="max-width: 65%;" title="{{ arm_path }}">{{ arm_path }}</span>
+                {% else %}
+                    <span class="text-danger">unavailable</span>
+                {% endif %}
+            </div>
+            <div class="d-flex justify-content-between align-items-center small py-1 border-top">
+                <span class="text-muted">Completed</span>
+                {% if serverutil.storage_completed_free != 0 %}
+                    <span class="text-truncate ms-2" style="max-width: 65%;" title="{{ media_path }}">{{ media_path }}</span>
+                {% else %}
+                    <span class="text-danger">unavailable</span>
+                {% endif %}
+            </div>
         </div>
-        <div class="card">
-            <div class="card-header text-center">
-                <strong>Hardware Transcoding Support</strong>
-            </div>
-            <ul class="list-group list-group-flush">
-                <!-- INTEL -->
-                <li class="list-group-item text-center">
-                    Intel QuickSync: {% if stats['hw_support']['intel'] %}
-                    <img src="{{ url_for('static', filename='img/success.png') }}"
-                         alt="update image" width="20px" height="20px">
-                {% else %}
-                    <img src="{{ url_for('static', filename='img/fail.png') }}"
-                         alt="update image" width="20px" height="20px">
-                    <a href="https://github.com/automatic-ripping-machine/automatic-ripping-machine/wiki/"
-                       target=”_blank”>
-                        <img title="Get Help from the wiki!"
-                             src="{{ url_for('static', filename='img/info.png') }}" width="20px"
-                             height="20px" alt="Get Help from the wiki!"></a>
-                {% endif %}
-                </li>
-                <!-- NVIDIA -->
-                <li class="list-group-item text-center">
-                    Nvidia NVENC:{% if stats['hw_support']['nvidia'] %}
-                    <img src="{{ url_for('static', filename='img/success.png') }}"
-                         alt="update image" width="20px" height="20px">
-                {% else %}
-                    <img src="{{ url_for('static', filename='img/fail.png') }}"
-                         alt="update image" width="20px" height="20px">
-                    <a href="https://github.com/automatic-ripping-machine/automatic-ripping-machine/wiki/"
-                       target=”_blank”>
-                        <img title="Get Help from the wiki!"
-                             src="{{ url_for('static', filename='img/info.png') }}" width="20px"
-                             height="20px" alt="Get Help from the wiki!"></a>
-                {% endif %}
-                </li>
-                <!-- AMD -->
-                <li class="list-group-item text-center">
-                    AMD VCN:{% if stats['hw_support']['amd'] %}
-                    <img src="{{ url_for('static', filename='img/success.png') }}"
-                         alt="update image" width="20px" height="20px">
-                {% else %}
-                    <img src="{{ url_for('static', filename='img/fail.png') }}"
-                         alt="update image" width="20px" height="20px">
-                    <a href="https://github.com/automatic-ripping-machine/automatic-ripping-machine/wiki/"
-                       target=”_blank”>
-                        <img title="Get Help from the wiki!"
-                             src="{{ url_for('static', filename='img/info.png') }}" width="20px"
-                             height="20px" alt="Get Help from the wiki!"></a>
-                {% endif %}
-                </li>
-            </ul>
+
+        <!-- Hardware Transcoding Support -->
+        <div class="card p-3">
+            <div class="fw-semibold mb-1">Hardware Transcoding</div>
+            {% for label, key in (('Intel QuickSync', 'intel'), ('Nvidia NVENC', 'nvidia'), ('AMD VCN', 'amd')) %}
+                <div class="d-flex justify-content-between align-items-center small py-1 border-top">
+                    <span class="text-muted">{{ label }}</span>
+                    {% if stats['hw_support'][key] %}
+                        <img src="{{ url_for('static', filename='img/success.png') }}" alt="supported" width="18" height="18">
+                    {% else %}
+                        <span class="d-flex align-items-center gap-1">
+                            <img src="{{ url_for('static', filename='img/fail.png') }}" alt="not supported" width="18" height="18">
+                            <a href="https://github.com/automatic-ripping-machine/automatic-ripping-machine/wiki/" target="_blank" rel="noopener">
+                                <img title="Get Help from the wiki!" src="{{ url_for('static', filename='img/info.png') }}" width="18" height="18" alt="Get help">
+                            </a>
+                        </span>
+                    {% endif %}
+                </div>
+            {% endfor %}
         </div>
     </div>
 {% endblock %}
