@@ -27,8 +27,19 @@ from arm.ui.settings import DriveUtils as drive_utils # noqa E402
 
 
 def get_notifications():
-    """Get all current notifications"""
-    all_notification = Notifications.query.filter_by(seen=False)
+    """
+    Get unseen notifications from roughly the last 15 minutes, for the toast popups.
+    Older unseen notifications are left out here - they still show up in the
+    persistent notification panel (see notifications.py, which filters on the
+    separate `cleared` flag instead), just without popping a toast. Otherwise
+    reopening the UI after it's been closed for a while replays every notification
+    since as a wall of toasts.
+    """
+    recent_cutoff = datetime.datetime.now() - datetime.timedelta(minutes=15)
+    all_notification = Notifications.query.filter(
+        Notifications.seen.is_(False),
+        Notifications.trigger_time >= recent_cutoff,
+    )
     notification = [a.get_d() for a in all_notification]
     return notification
 
