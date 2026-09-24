@@ -32,6 +32,16 @@
     border-color: #3f6a91;
 }
 
+/* Job progress bars render a "97%"-style label as a <small class="position-
+   absolute w-100"> sitting inside .progress - it needs .progress to be a
+   positioned ancestor, or the label has no containing block of its own and
+   falls back to one much wider up the tree (the card row, or wider), making
+   w-100 stretch it out past the progress bar and over whatever sits next to
+   it (e.g. the Abandon Job button). */
+.progress {
+    position: relative;
+}
+
 /* Sidebar shell layout - width/position only. */
 .sidebar {
     width: 260px;
