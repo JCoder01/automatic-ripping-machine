@@ -40,7 +40,12 @@
 
         <!-- Storage -->
         <div class="card p-3">
-            <div class="fw-semibold">Storage</div>
+            <div class="d-flex justify-content-between align-items-baseline">
+                <span class="fw-semibold">Storage</span>
+                {% if serverutil.storage_completed_free != 0 %}
+                    <span class="fw-bold">{{ serverutil.storage_completed_percent }}%</span>
+                {% endif %}
+            </div>
             <div class="text-muted small mb-2">
                 {% if serverutil.storage_completed_free != 0 %}
                     {{ serverutil.storage_completed_free }} GB free
@@ -48,6 +53,13 @@
                     Unable to get data
                 {% endif %}
             </div>
+            {% if serverutil.storage_completed_free != 0 %}
+                <div class="progress mb-1" style="height: 6px;" role="progressbar"
+                     aria-valuenow="{{ serverutil.storage_completed_percent }}" aria-valuemin="0" aria-valuemax="100">
+                    <div class="progress-bar{{ ' bg-danger' if serverutil.storage_completed_percent > 80 }}"
+                         style="width: {{ serverutil.storage_completed_percent }}%;"></div>
+                </div>
+            {% endif %}
             <div class="d-flex justify-content-between align-items-center small py-1 border-top">
                 <span class="text-muted">Transcode</span>
                 {% if server.storage_transcode_free != 0 %}

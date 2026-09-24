@@ -9,6 +9,26 @@
 :root {
     --bs-primary: #3f6a91;
     --bs-primary-rgb: 63, 106, 145;
+
+    /* Typography: Bootstrap's own stack already leads with system-ui: this
+       just prefers Inter first (a no-op if the OS/browser doesn't have it -
+       no font file to vendor, no network request) and trims the base size
+       and heading scale down from BS5's defaults, which run large (16px
+       body, viewport-scaled calc() headings that can exceed 40px) for a
+       tighter, more typical dashboard density. */
+    --bs-font-sans-serif: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --bs-body-font-size: 0.9375rem;
+}
+
+.h1, h1 { font-size: 1.75rem; }
+.h2, h2 { font-size: 1.625rem; }
+.h3, h3 { font-size: 1.5rem; }
+.h4, h4 { font-size: 1.375rem; }
+.h5, h5 { font-size: 1.25rem; }
+.h6, h6 { font-size: 1.0625rem; }
+
+.small, small {
+    font-size: .8125rem;
 }
 
 .btn-primary {
@@ -23,23 +43,25 @@
     --bs-btn-focus-shadow-rgb: 92, 133, 165;
 }
 
-.nav-pills {
-    --bs-nav-pills-link-active-bg: #325474;
-}
-
 .form-check-input:checked {
     background-color: #3f6a91;
     border-color: #3f6a91;
 }
 
-/* #darkSwitch lives directly on the sidebar's own bg-primary background, so
-   the override above would make its checked track exactly the same color as
-   its own backdrop - invisible. Give it a distinctly darker, neutral track
-   instead (the white thumb dot still comes from Bootstrap's own switch SVG,
-   unaffected by background-color). */
+/* #darkSwitch lives directly on the top bar; kept as a distinct dark neutral
+   so its checked state doesn't depend on which page background it happens
+   to sit on. */
 #darkSwitch:checked {
     background-color: #212529;
     border-color: #212529;
+}
+
+/* Cards: a restrained single border color + a slight surface tint + a soft
+   shadow, instead of every region getting the same hard outline. */
+.card {
+    background-color: var(--bs-tertiary-bg);
+    border-color: var(--bs-border-color-translucent);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .06);
 }
 
 /* Job progress bars render a "97%"-style label as a <small class="position-
@@ -93,17 +115,87 @@
     }
 }
 
-/* Sidebar shell layout - width/position only. */
+/* ---------- Sidebar ---------- */
+/* A dark neutral instead of the solid brand blue filling the whole nav
+   column - lower visual weight, and a fixed dark treatment regardless of
+   the light/dark toggle (the content area still follows it) is the common
+   pattern in this kind of dashboard sidebar. */
 .sidebar {
-    width: 260px;
+    width: 232px;
+    background-color: #1b1e25 !important;
+    border-right: 1px solid rgba(255, 255, 255, .08);
 }
 
 @media (min-width: 768px) {
     .sidebar {
         position: sticky;
         top: 0;
-        flex: 0 0 260px;
+        flex: 0 0 232px;
         height: 100vh;
         overflow-y: auto;
     }
+}
+
+.sidebar .nav {
+    gap: .25rem !important;
+    padding-left: .75rem !important;
+    padding-right: .75rem !important;
+}
+
+.sidebar .nav-link {
+    display: flex;
+    align-items: center;
+    color: rgba(255, 255, 255, .65);
+    border-left: 3px solid transparent;
+    border-radius: .375rem;
+    padding: .625rem .75rem;
+    font-size: .9375rem;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+.sidebar .nav-link svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+.sidebar .nav-link:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, .06);
+}
+
+/* activeTab() (head.html) adds .active to the <li>, not the <a> itself. */
+.sidebar .nav-item.active .nav-link {
+    color: #fff;
+    background-color: rgba(255, 255, 255, .09);
+    border-left-color: #6ea0c7;
+}
+
+.sidebar .offcanvas-header {
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.sidebar hr {
+    border-color: rgba(255, 255, 255, .08);
+    opacity: 1;
+}
+
+/* ---------- Top bar icon buttons ---------- */
+/* Consistent ~40px hit targets for the dark-mode/notifications/restart
+   controls, grouped in a slightly-tinted bar rather than floating loose on
+   the page background. */
+.top-bar {
+    background-color: var(--bs-tertiary-bg);
+    border-radius: .5rem;
+    padding: .375rem;
+}
+
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: .5rem;
 }

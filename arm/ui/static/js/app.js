@@ -143,4 +143,9 @@
     document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
         new bootstrap.Popover(el);
     });
+
+    // ---------- Tooltips (top bar icon buttons) ----------
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+        new bootstrap.Tooltip(el);
+    });
 })();
