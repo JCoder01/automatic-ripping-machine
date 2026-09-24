@@ -76,7 +76,7 @@
                     <img src="/static/img/{{ status_icon }}.png" height="30" width="30"
                          alt="{{ job.status }}" title="{{ job.status }}">
                 </td>
-                <td><a href="/logs?logfile={{ job.logfile }}&mode=full">{{ job.logfile|truncate(50, True)
+                <td><a href="/logs?logfile={{ job.logfile }}&mode=full&job_id={{ job.job_id }}">{{ job.logfile|truncate(50, True)
                     if job.logfile is not none else 'Unknown logfile' }}</a></td>
                 <td>
                     {% if job.status == 'transcode_failed' %}

@@ -31,9 +31,10 @@ def logs():
     """
     mode = request.args['mode']
     logfile = request.args['logfile']
+    job_id = request.args.get('job_id')
     session["page_title"] = "Logs"
 
-    return render_template('logview.html', file=logfile, mode=mode)
+    return render_template('logview.html', file=logfile, mode=mode, job_id=job_id)
 
 
 @route_logs.route('/listlogs', defaults={'path': ''})

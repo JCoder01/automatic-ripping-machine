@@ -5,7 +5,10 @@
 
 <div class="log-terminal">
     <div class="log-terminal-header d-flex align-items-center">
-        <div class="log-terminal-title text-truncate flex-grow-1">{{ file }}</div>
+        <div class="log-terminal-title text-truncate flex-grow-1">
+            {{ file }}
+            <span id="logFinishedBadge" class="text-muted" style="display:none;">&middot; finished, no longer updating</span>
+        </div>
         <div class="d-flex align-items-center gap-1">
             <button type="button" class="icon-btn-sm" id="tailToggle" aria-pressed="true"
                     data-bs-toggle="tooltip" data-bs-placement="bottom" title="Pause auto-scroll">
@@ -63,6 +66,8 @@
         setFollow(!follow);
     });
 
+    let finished = false;
+
     const xhr = new XMLHttpRequest();
     {% if mode == 'tail' or mode == 'full' %}
         xhr.open('GET', '/logreader?logfile={{ file }}&mode=full&json=1');
@@ -71,11 +76,49 @@
     {% endif %}
     xhr.send();
 
-    setInterval(function() {
+    const tailInterval = setInterval(function() {
+        if (finished) {
+            return;
+        }
         output.textContent = xhr.responseText;
         if (follow) {
             output.scrollTop = output.scrollHeight;
         }
     }, 1000);
+
+    {% if job_id %}
+        // /logreader's stream never closes on its own (see the comment above),
+        // so once the job it belongs to is no longer running there's nothing
+        // new left to tail - stop polling job status, abort the stream (or it
+        // leaks an open connection on the server forever), and freeze the
+        // display on whatever was last received.
+        let statusInterval;
+
+        function stopTailing() {
+            finished = true;
+            clearInterval(tailInterval);
+            clearInterval(statusInterval);
+            xhr.abort();
+            const badge = document.getElementById('logFinishedBadge');
+            if (badge) {
+                badge.style.display = '';
+            }
+        }
+
+        function checkJobStatus() {
+            fetch('/json?mode=job&job={{ job_id }}', {headers: {'HX-Request': 'true'}})
+                .then(function (response) {
+                    if (response.status === 286) {
+                        stopTailing();
+                    }
+                })
+                .catch(function () {
+                    // transient network error - try again next interval
+                });
+        }
+
+        checkJobStatus();
+        statusInterval = setInterval(checkJobStatus, 5000);
+    {% endif %}
 </script>
 {% endblock %}

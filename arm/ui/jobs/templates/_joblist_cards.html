@@ -47,7 +47,7 @@
                                         </svg>
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end">
-                                        <li><a class="dropdown-item" href="/logs?logfile={{ job.logfile }}&mode=full">View logfile</a></li>
+                                        <li><a class="dropdown-item" href="/logs?logfile={{ job.logfile }}&mode=full&job_id={{ job.job_id }}">View logfile</a></li>
                                         {% if job.status == 'transcode_failed' %}
                                             <li>
                                                 <button type="button" class="dropdown-item"
