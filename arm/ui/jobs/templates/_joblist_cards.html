@@ -48,6 +48,25 @@
                                     </button>
                                     <ul class="dropdown-menu dropdown-menu-end">
                                         <li><a class="dropdown-item" href="/logs?logfile={{ job.logfile }}&mode=full">View logfile</a></li>
+                                        {% if job.status == 'transcode_failed' %}
+                                            <li>
+                                                <button type="button" class="dropdown-item"
+                                                        hx-get="/json?job={{ job.job_id }}&mode=retry_transcode"
+                                                        hx-confirm="Retry transcoding this job using the files already ripped from the disc?"
+                                                        data-confirm-title="Retry transcoding this job?"
+                                                        hx-swap="none"
+                                                        hx-on::after-request="if(event.detail.successful) location.reload()">Retry Transcode</button>
+                                            </li>
+                                        {% elif job.status == 'fail' and job.disctype in ('dvd', 'bluray') %}
+                                            <li>
+                                                <button type="button" class="dropdown-item"
+                                                        hx-get="/json?job={{ job.job_id }}&mode=rip_via_iso"
+                                                        hx-confirm="Make sure the disc is back in the drive. ARM will first make a tolerant copy of the whole disc to an ISO (this can take a long time and a lot of disk space), then retry the rip from that. Continue?"
+                                                        data-confirm-title="Rip via ISO?"
+                                                        hx-swap="none"
+                                                        hx-on::after-request="if(event.detail.successful) location.reload()">Rip via ISO</button>
+                                            </li>
+                                        {% endif %}
                                         {% if job.video_type != "Music" %}
                                             <li><a class="dropdown-item" href="/titlesearch?job_id={{ job.job_id }}">Title search</a></li>
                                             <li><a class="dropdown-item" href="/customTitle?job_id={{ job.job_id }}">Custom title</a></li>
