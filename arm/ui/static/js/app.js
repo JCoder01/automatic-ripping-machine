@@ -27,6 +27,7 @@
 
             function onYes() {
                 cleanup();
+                confirmModal.hide();
                 evt.detail.issueRequest(true);
             }
             function cleanup() {
