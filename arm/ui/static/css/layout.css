@@ -32,6 +32,16 @@
     border-color: #3f6a91;
 }
 
+/* #darkSwitch lives directly on the sidebar's own bg-primary background, so
+   the override above would make its checked track exactly the same color as
+   its own backdrop - invisible. Give it a distinctly darker, neutral track
+   instead (the white thumb dot still comes from Bootstrap's own switch SVG,
+   unaffected by background-color). */
+#darkSwitch:checked {
+    background-color: #212529;
+    border-color: #212529;
+}
+
 /* Job progress bars render a "97%"-style label as a <small class="position-
    absolute w-100"> sitting inside .progress - it needs .progress to be a
    positioned ancestor, or the label has no containing block of its own and

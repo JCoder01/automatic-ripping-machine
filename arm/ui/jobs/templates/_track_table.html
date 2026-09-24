@@ -65,6 +65,7 @@
 {% if manual_edit %}
     <form method="POST" action="/rescan_tracks?job_id={{ jobs.job_id }}"
           class="row row-cols-auto g-2 align-items-center mt-2">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <label for="min_length" class="col-auto col-form-label">Minimum track length to include (seconds):</label>
         <div class="col-auto">
             <input type="number" id="min_length" name="min_length" min="0"
