@@ -21,7 +21,8 @@ from flask_login import LoginManager, login_required, \
 from sqlalchemy.exc import SQLAlchemyError
 
 import arm.ui.utils as ui_utils
-from arm.ui import app, constants, json_api
+from arm.ui import app, db, constants, json_api
+from arm.models.job import Job
 from arm.models.system_info import SystemInfo
 from arm.models.user import User
 import arm.config.config as cfg
@@ -71,12 +72,15 @@ def home():
             # mode=joblist), so the initial page render and every poll after it agree -
             # no more flash of an empty #joblist while the first poll is in flight.
             joblist = json_api.get_x_jobs('joblist')
+            recent_history = Job.query.filter(Job.finished) \
+                .order_by(db.desc(Job.job_id)).limit(5).all()
         except SQLAlchemyError as e:
             # db isn't setup
             app.logger.error(f"Error getting jobs from DB: {e}")
             return redirect(url_for('setup'))
     else:
         joblist = {'results': {}, 'arm_name': cfg.arm_config['ARM_NAME']}
+        recent_history = []
 
     # Set authentication state for index
     authenticated = ui_utils.authenticated_state()
@@ -89,7 +93,9 @@ def home():
                            arm_name=joblist['arm_name'],
                            children=cfg.arm_config['ARM_CHILDREN'],
                            server=server, serverutil=serverutil,
-                           arm_path=arm_path, media_path=media_path, stats=stats)
+                           arm_path=arm_path, media_path=media_path, stats=stats,
+                           recent_history=recent_history,
+                           date_format=cfg.arm_config['DATE_FORMAT'])
 
 
 @app.route('/error')
