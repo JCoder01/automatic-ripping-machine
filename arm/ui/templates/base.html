@@ -56,6 +56,18 @@
             </main>
         </div>
 
+        <!-- Floating notifications panel, opened from the bell icon (see app.js) -->
+        <div id="notificationPanel" class="notification-panel shadow rounded-3 border">
+            <div class="d-flex justify-content-between align-items-center p-3 border-bottom bg-body-tertiary rounded-top-3">
+                <strong>Notifications</strong>
+                <div class="d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="notificationClearAll">Clear All</button>
+                    <button type="button" class="btn-close" id="notificationPanelClose" aria-label="Close"></button>
+                </div>
+            </div>
+            <div id="notificationPanelBody" class="p-3 overflow-auto flex-grow-1"></div>
+        </div>
+
         <!-- Shared confirm dialog: app.js repoints htmx's hx-confirm into this modal -->
         <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-dialog-centered">

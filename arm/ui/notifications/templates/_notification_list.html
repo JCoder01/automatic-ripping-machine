@@ -1,0 +1,16 @@
+{# Notification list content, shared by the floating panel (app.js) and the
+   full-page fallback (notificationview.html). Expects notifications_new
+   (a list, or None/empty when there's nothing uncleared). #}
+{% if notifications_new %}
+    {% for notification in notifications_new %}
+        <div class="card mb-2">
+            <div class="card-body">
+                <h6 class="card-title mb-1"><strong>{{ notification.title }}</strong></h6>
+                <h6 class="card-subtitle mb-2 text-muted small">{{ notification.diff_time }} ({{ notification.trigger_time.strftime('%d-%b-%y %H:%M') }})</h6>
+                <p class="card-text mb-0">{{ notification.message }}</p>
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <p class="text-muted text-center mb-0">No new notifications</p>
+{% endif %}

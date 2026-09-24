@@ -6,8 +6,10 @@ Covers
 - arm_notification_close [GET}
 """
 
+import json
+
 from flask_login import login_required  # noqa: F401
-from flask import render_template, Blueprint, redirect, flash, session
+from flask import render_template, Blueprint, redirect, flash, session, request
 from datetime import datetime
 
 import arm.ui.utils as ui_utils
@@ -52,6 +54,11 @@ def arm_notification():
     else:
         notifications_new = None
 
+    # The floating notification panel (see app.js) fetches this same route as
+    # a fragment instead of navigating to the full page.
+    if request.headers.get('HX-Request') == 'true':
+        return render_template('_notification_list.html', notifications_new=notifications_new)
+
     session["page_title"] = "Notifications"
 
     return render_template('notificationview.html',
@@ -65,8 +72,9 @@ def arm_notification_close():
     function to close all open notifications
     """
     notifications = Notifications.query.filter_by(cleared='0').all()
+    cleared_count = len(notifications)
 
-    if len(notifications) != 0:
+    if cleared_count != 0:
         # get the current time for each notification and then save back into notification
         for notification in notifications:
             args = {
@@ -75,7 +83,15 @@ def arm_notification_close():
             }
             ui_utils.database_updater(args, notification)
 
-        flash(f'Cleared {len(notifications)} Notifications', 'success')
+    if request.headers.get('HX-Request') == 'true':
+        response = app.make_response(render_template('_notification_list.html', notifications_new=None))
+        if cleared_count != 0:
+            # Tells app.js to clear the badge count without a full page reload.
+            response.headers['HX-Trigger'] = json.dumps({'notificationsCleared': True})
+        return response
+
+    if cleared_count != 0:
+        flash(f'Cleared {cleared_count} Notifications', 'success')
     else:
         flash('No notifications to clear', 'error')
 

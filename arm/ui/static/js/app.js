@@ -79,6 +79,63 @@
         });
     }
 
+    // ---------- Notifications panel ----------
+    const notificationBellBtn = document.getElementById("notificationBellBtn");
+    const notificationPanel = document.getElementById("notificationPanel");
+    if (notificationBellBtn && notificationPanel) {
+        const closeBtn = document.getElementById("notificationPanelClose");
+        const clearAllBtn = document.getElementById("notificationClearAll");
+        const panelBody = document.getElementById("notificationPanelBody");
+
+        function onDocClick(evt) {
+            if (!notificationPanel.contains(evt.target) && !notificationBellBtn.contains(evt.target)) {
+                closePanel();
+            }
+        }
+        function onKeydown(evt) {
+            if (evt.key === "Escape") {
+                closePanel();
+            }
+        }
+        function openPanel() {
+            notificationPanel.classList.add("show");
+            htmx.ajax("GET", "/notificationview", {target: panelBody, swap: "innerHTML"});
+            // Capture phase + next tick, so the click that opened the panel
+            // doesn't immediately bubble into onDocClick and close it again.
+            setTimeout(() => document.addEventListener("click", onDocClick, true), 0);
+            document.addEventListener("keydown", onKeydown);
+        }
+        function closePanel() {
+            notificationPanel.classList.remove("show");
+            document.removeEventListener("click", onDocClick, true);
+            document.removeEventListener("keydown", onKeydown);
+        }
+
+        notificationBellBtn.addEventListener("click", function (evt) {
+            evt.preventDefault();
+            if (notificationPanel.classList.contains("show")) {
+                closePanel();
+            } else {
+                openPanel();
+            }
+        });
+        if (closeBtn) {
+            closeBtn.addEventListener("click", closePanel);
+        }
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener("click", function () {
+                htmx.ajax("GET", "/notificationclose", {target: panelBody, swap: "innerHTML"});
+            });
+        }
+
+        document.body.addEventListener("notificationsCleared", function () {
+            const badge = document.getElementById("notificationBadge");
+            if (badge) {
+                badge.remove();
+            }
+        });
+    }
+
     // ---------- Popovers (settings page's "more info" hints) ----------
     // BS5 popovers need explicit init, unlike BS4's implicit jQuery plugin
     // scan. Nothing on this page currently swaps in new popover triggers via
