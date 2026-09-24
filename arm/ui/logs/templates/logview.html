@@ -96,6 +96,12 @@
 
         function stopTailing() {
             finished = true;
+            // Grab whatever's arrived so far before abort() tears down the
+            // connection (and, in some browsers, clears xhr.responseText).
+            output.textContent = xhr.responseText;
+            if (follow) {
+                output.scrollTop = output.scrollHeight;
+            }
             clearInterval(tailInterval);
             clearInterval(statusInterval);
             xhr.abort();
@@ -117,7 +123,10 @@
                 });
         }
 
-        checkJobStatus();
+        // Skip the immediate check - it can otherwise win the race against the
+        // tail stream's first render and freeze the display on "Loading..."
+        // before any content ever arrives. The log is fully visible well
+        // before the first status check at 5s either way.
         statusInterval = setInterval(checkJobStatus, 5000);
     {% endif %}
 </script>
