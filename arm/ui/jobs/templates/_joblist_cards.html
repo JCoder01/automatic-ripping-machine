@@ -65,7 +65,7 @@
                                                     hx-get="/json?mode=abandon&job={{ job.job_id }}"
                                                     hx-confirm="This job will be abandoned. You cannot set it back to active! Are you sure?"
                                                     data-confirm-title="Abandon this job?"
-                                                    hx-swap="none">Abandon job</button>
+                                                    hx-target="#jobId{{ job.job_id }}" hx-swap="outerHTML swap:0.3s">Abandon job</button>
                                         </li>
                                     </ul>
                                 </div>
