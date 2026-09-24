@@ -14,37 +14,24 @@
                  hx-swap="innerHTML">
                 {% include "_active_rips_section.html" %}
             </div>
+
+            {% if recent_history %}
+                <div class="row mt-4">
+                    <div class="col-12 d-flex justify-content-center align-items-center gap-2">
+                        <h5 class="mb-0"><strong>Recent History</strong></h5>
+                        <a href="/history" class="small link-secondary link-underline-opacity-0">View all</a>
+                    </div>
+                </div>
+                <div class="row row-cols-1 g-3">
+                    {% with results=recent_history %}
+                        {% include "_joblist_cards.html" %}
+                    {% endwith %}
+                </div>
+            {% endif %}
         </div>
         <div class="col-lg-4">
             <h5 class="text-center"><strong>System Information</strong></h5>
             {% include 'settings/sysinfo.html' %}
-
-            <div class="card p-3 mt-3">
-                <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="fw-semibold">Recent History</span>
-                    <a href="/history" class="small link-secondary link-underline-opacity-0">View all</a>
-                </div>
-                {% if recent_history %}
-                    <div class="d-flex flex-column gap-2">
-                        {% for job in recent_history %}
-                            {% set status_icon = 'fail' if job.status == 'transcode_failed' else job.status %}
-                            <div class="d-flex align-items-center gap-2">
-                                <img src="/static/img/{{ status_icon }}.png" width="18" height="18"
-                                     alt="{{ job.status }}" title="{{ job.status }}">
-                                <a href="/jobdetail?job_id={{ job.job_id }}"
-                                   class="text-body text-decoration-none text-truncate small flex-grow-1" style="min-width: 0;">
-                                    {{ job.title|truncate(40, True) if job.title is not none else 'Title unknown' }}
-                                </a>
-                                <span class="text-muted small text-nowrap">
-                                    {{ job.start_time.strftime(date_format) if job.start_time is not none else '' }}
-                                </span>
-                            </div>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <div class="text-muted small">No history yet.</div>
-                {% endif %}
-            </div>
         </div>
     </div>
 {% endblock %}

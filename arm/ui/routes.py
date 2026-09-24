@@ -72,15 +72,18 @@ def home():
             # mode=joblist), so the initial page render and every poll after it agree -
             # no more flash of an empty #joblist while the first poll is in flight.
             joblist = json_api.get_x_jobs('joblist')
-            recent_history = Job.query.filter(Job.finished) \
+            # Same dict shape as joblist['results'] (json_api.build_job_result) so
+            # _joblist_cards.html can render these as ordinary job cards too.
+            recent_jobs = Job.query.filter(Job.finished) \
                 .order_by(db.desc(Job.job_id)).limit(5).all()
+            recent_history = {i: json_api.build_job_result(j) for i, j in enumerate(recent_jobs)}
         except SQLAlchemyError as e:
             # db isn't setup
             app.logger.error(f"Error getting jobs from DB: {e}")
             return redirect(url_for('setup'))
     else:
         joblist = {'results': {}, 'arm_name': cfg.arm_config['ARM_NAME']}
-        recent_history = []
+        recent_history = {}
 
     # Set authentication state for index
     authenticated = ui_utils.authenticated_state()
@@ -94,8 +97,7 @@ def home():
                            children=cfg.arm_config['ARM_CHILDREN'],
                            server=server, serverutil=serverutil,
                            arm_path=arm_path, media_path=media_path, stats=stats,
-                           recent_history=recent_history,
-                           date_format=cfg.arm_config['DATE_FORMAT'])
+                           recent_history=recent_history)
 
 
 @app.route('/error')
