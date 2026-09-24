@@ -199,3 +199,79 @@
     padding: 0;
     border-radius: .5rem;
 }
+
+/* ---------- Log viewer terminal ---------- */
+/* Fixed dark chrome regardless of the light/dark toggle, same reasoning as
+   the sidebar - it's meant to read as a terminal window either way. */
+.log-terminal {
+    background-color: #12141a;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: .5rem;
+    overflow: hidden;
+}
+
+.log-terminal-header {
+    background-color: #1b1e25;
+    padding: .5rem .75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
+    gap: .75rem;
+}
+
+.log-terminal-dots {
+    display: flex;
+    gap: .375rem;
+    flex-shrink: 0;
+}
+
+.log-terminal-dots span {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.log-terminal-dots span:nth-child(1) { background-color: #ff5f56; }
+.log-terminal-dots span:nth-child(2) { background-color: #ffbd2e; }
+.log-terminal-dots span:nth-child(3) { background-color: #27c93f; }
+
+.log-terminal-title {
+    color: rgba(255, 255, 255, .55);
+    font-family: var(--bs-font-monospace);
+    font-size: .8125rem;
+}
+
+.log-terminal-body {
+    margin: 0;
+    padding: 1rem;
+    max-height: 70vh;
+    overflow-y: auto;
+    color: #d4d4d4;
+    background-color: #12141a;
+    font-family: var(--bs-font-monospace);
+    font-size: .8125rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.log-terminal .icon-btn-sm {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border-radius: .375rem;
+    color: rgba(255, 255, 255, .65);
+    background: transparent;
+    border: none;
+}
+
+.log-terminal .icon-btn-sm:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, .08);
+}
+
+.log-terminal .icon-btn-sm[aria-pressed="false"] {
+    color: #ffbd2e;
+}

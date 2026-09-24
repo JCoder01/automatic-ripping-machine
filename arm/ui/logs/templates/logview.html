@@ -1,11 +1,34 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h4>Loading log: {{ file }}...</h4>
-<div id="container">
-    <div id="log">
-        <pre id="{{ file }}"></pre>
+<h2 class="mb-3">Log Viewer</h2>
+
+<div class="log-terminal">
+    <div class="log-terminal-header d-flex align-items-center">
+        <div class="log-terminal-dots">
+            <span></span><span></span><span></span>
+        </div>
+        <div class="log-terminal-title text-truncate flex-grow-1">{{ file }}</div>
+        <div class="d-flex align-items-center gap-1">
+            <button type="button" class="icon-btn-sm" id="tailToggle" aria-pressed="true"
+                    data-bs-toggle="tooltip" data-bs-placement="bottom" title="Pause auto-scroll">
+                <svg id="tailIconPause" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M5 3.5a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-3 0V5A1.5 1.5 0 0 1 5 3.5m6 0a1.5 1.5 0 0 1 1.5 1.5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5"/>
+                </svg>
+                <svg id="tailIconPlay" style="display:none" xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
+                </svg>
+            </button>
+            <a class="icon-btn-sm" href="/logreader?logfile={{ file }}&mode=download"
+               data-bs-toggle="tooltip" data-bs-placement="bottom" title="Download log">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5"/>
+                    <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708z"/>
+                </svg>
+            </a>
+        </div>
     </div>
+    <pre id="{{ file }}" class="log-terminal-body">Loading...</pre>
 </div>
 {% endblock %}
 {% block footer %}{{ super() }}{% endblock %}
@@ -18,6 +41,30 @@
     // xhr.responseText buffer - it must NOT be re-fetched on an interval,
     // that would leak one open streaming connection per poll.
     const output = document.getElementById('{{ file }}');
+    const tailToggle = document.getElementById('tailToggle');
+    const tailIconPause = document.getElementById('tailIconPause');
+    const tailIconPlay = document.getElementById('tailIconPlay');
+    let follow = true;
+
+    function setFollow(state) {
+        follow = state;
+        tailIconPause.style.display = follow ? '' : 'none';
+        tailIconPlay.style.display = follow ? 'none' : '';
+        tailToggle.setAttribute('aria-pressed', follow);
+        const tooltipText = follow ? 'Pause auto-scroll' : 'Resume auto-scroll (tail)';
+        tailToggle.setAttribute('title', tooltipText);
+        const tooltip = bootstrap.Tooltip.getInstance(tailToggle);
+        if (tooltip) {
+            tooltip.setContent({'.tooltip-inner': tooltipText});
+        }
+        if (follow) {
+            output.scrollTop = output.scrollHeight;
+        }
+    }
+
+    tailToggle.addEventListener('click', function () {
+        setFollow(!follow);
+    });
 
     const xhr = new XMLHttpRequest();
     {% if mode == 'tail' or mode == 'full' %}
@@ -29,9 +76,9 @@
 
     setInterval(function() {
         output.textContent = xhr.responseText;
-        {% if mode == 'tail' %}
-            window.scrollTo(0, document.querySelector("#content").scrollHeight);
-        {% endif %}
+        if (follow) {
+            output.scrollTop = output.scrollHeight;
+        }
     }, 1000);
 </script>
 {% endblock %}
