@@ -4,34 +4,15 @@
         <div id="toastHolder" class="position-fixed top-0 end-0 p-3" style="z-index: 1080;"></div>
     </div>
 
-    <!-- Slim top bar, mobile only: opens the sidebar as an off-canvas drawer -->
-    <nav class="navbar navbar-dark d-md-none sticky-top" style="background-color:#1b1e25;">
-        <div class="container-fluid">
-            <button class="btn btn-link text-white p-0" type="button" data-bs-toggle="offcanvas"
-                    data-bs-target="#sidebar" aria-controls="sidebar" aria-label="Toggle navigation">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16">
-                    <path fill-rule="evenodd" d="M2.5 12a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5m0-4a.5.5 0 0 1 .5-.5h10a.5.5 0 0 1 0 1H3a.5.5 0 0 1-.5-.5"/>
-                </svg>
-            </button>
-            <a class="navbar-brand mx-auto" href="/">
-                <img src="{{ url_for('static', filename='img/arm40nw.png') }}" width="86" height="30" alt="ARM">
-            </a>
-            <span style="width: 24px;"></span>
-        </div>
-    </nav>
-
     <!-- Sidebar: persistent on >=md, an off-canvas drawer below that -->
     <div class="offcanvas-md offcanvas-start text-white sidebar" tabindex="-1" id="sidebar"
          aria-labelledby="sidebarLabel">
         <div class="offcanvas-header d-md-none">
-            <h5 class="offcanvas-title text-white" id="sidebarLabel">ARM</h5>
+            <h5 class="offcanvas-title text-white" id="sidebarLabel">Menu</h5>
             <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas"
                     data-bs-target="#sidebar" aria-label="Close"></button>
         </div>
         <div class="offcanvas-body d-flex flex-column flex-grow-1 p-0">
-            <a class="navbar-brand d-none d-md-block text-center py-3" href="/">
-                <img src="{{ url_for('static', filename='img/arm40nw.png') }}" width="114" height="40" alt="ARM">
-            </a>
             <ul class="nav flex-column mb-auto">
                 <li id="navhome" class="nav-item">
                     <a class="nav-link" href="/">

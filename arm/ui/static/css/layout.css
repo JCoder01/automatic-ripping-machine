@@ -129,9 +129,9 @@
 @media (min-width: 768px) {
     .sidebar {
         position: sticky;
-        top: 0;
+        top: 60px;
         flex: 0 0 232px;
-        height: 100vh;
+        height: calc(100vh - 60px);
         overflow-y: auto;
     }
 }
@@ -140,6 +140,10 @@
     gap: .25rem !important;
     padding-left: .75rem !important;
     padding-right: .75rem !important;
+}
+
+.sidebar .nav-item:not(:last-child) {
+    border-bottom: 1px solid rgba(255, 255, 255, .06);
 }
 
 .sidebar .nav-link {
@@ -157,6 +161,7 @@
     width: 18px;
     height: 18px;
     flex-shrink: 0;
+    transition: color .15s ease;
 }
 
 .sidebar .nav-link:hover {
@@ -171,6 +176,12 @@
     border-left-color: #6ea0c7;
 }
 
+/* The current page is marked by its icon, not just the bar/tint - reads at
+   a glance even when scrolled past the label. */
+.sidebar .nav-item.active .nav-link svg {
+    color: #6ea0c7;
+}
+
 .sidebar .offcanvas-header {
     border-bottom: 1px solid rgba(255, 255, 255, .08);
 }
@@ -180,14 +191,29 @@
     opacity: 1;
 }
 
-/* ---------- Top bar icon buttons ---------- */
-/* Consistent ~40px hit targets for the dark-mode/notifications/restart
-   controls, grouped in a slightly-tinted bar rather than floating loose on
-   the page background. */
-.top-bar {
-    background-color: var(--bs-tertiary-bg);
-    border-radius: .5rem;
-    padding: .375rem;
+/* ---------- App header ---------- */
+/* Full-width bar above the sidebar/content row - brand on the left, the
+   dark-mode/notifications/restart controls on the right. Same fixed dark
+   chrome as the sidebar, since together they form the app's persistent
+   frame rather than themed content. */
+.app-header {
+    height: 60px;
+    background-color: #1b1e25;
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
+    position: sticky;
+    top: 0;
+    z-index: 1030;
+}
+
+.app-header-brand {
+    color: #fff;
+    text-decoration: none;
+}
+
+.app-header-toggle {
+    color: rgba(255, 255, 255, .85);
+    border: none;
+    background: none;
 }
 
 .icon-btn {
@@ -198,6 +224,21 @@
     justify-content: center;
     padding: 0;
     border-radius: .5rem;
+}
+
+/* The dark-mode/notifications/restart buttons sit directly on the header's
+   dark chrome regardless of the page's own light/dark theme, so they get
+   their own fixed light-on-dark treatment rather than Bootstrap's
+   theme-following btn-outline-secondary. */
+.app-header .icon-btn {
+    color: rgba(255, 255, 255, .75);
+    border: none;
+    background: none;
+}
+
+.app-header .icon-btn:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, .08);
 }
 
 /* ---------- Log viewer terminal ---------- */
