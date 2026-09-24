@@ -101,6 +101,10 @@ MAX_CONCURRENT_MAKEMKVINFO: 0
 # "status=progress" to log progress
 DATA_RIP_PARAMETERS: ""
 
+# Additional parameters for ddrescue, used by the "Rip via ISO" retry on a failed job.
+# e.g. "-n" to skip the slow initial scraping pass
+ISO_RESCUE_PARAMETERS: ""
+
 # This selects the metadata provider, Each provider has their own ups and downs
 # But a general rule would be
 #    OMDB for movies and shows
@@ -117,9 +121,10 @@ GET_AUDIO_TITLE: "musicbrainz"
 # Requires FFmpeg
 RIP_POSTER: false
 
-# Auto-ejects disks
-# Auto-ejects disks when complete etc
+# Auto-ejects disks when a job completes
 # Set to false to disable auto-ejection
+# Set to "on-success" to only eject when the job succeeded, leaving failed
+# rips in the drive for inspection/retry
 AUTO_EJECT: true
 
 

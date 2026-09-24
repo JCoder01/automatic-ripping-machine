@@ -48,6 +48,21 @@ route_settings = Blueprint('route_settings', __name__,
 REDIRECT_SETTINGS = "route_settings.settings"
 
 
+@app.context_processor
+def arm_header_drives():
+    """
+    Inject the configured optical drives into every page, for the header's
+    eject button. A plain DB read only - no live tray-status query (that's a
+    blocking kernel call, see DriveUtils.update_tray_status/tray_status) since
+    this runs on every page load, not just the drives settings tab.
+    """
+    try:
+        drives = drive_utils.get_drives()
+    except Exception:
+        drives = []
+    return dict(header_drives=drives)
+
+
 def mask_last(value, n=4):
     """
     Replaces the last `n` characters of a string with asterisks.

@@ -305,7 +305,12 @@ class Job(db.Model):
         return return_dict
 
     def eject(self):
-        """Eject disc if it hasn't previously been ejected
+        """Eject disc if it hasn't previously been ejected, honoring AUTO_EJECT
+        (true/false, or "on-success" to only eject once the job's final status is
+        known to be a success). The earlier post-rip eject() call in makemkv.py
+        runs before the transcode outcome is known, so under "on-success" that
+        call is a no-op and the disc only actually ejects from the finally:
+        block in arm/ripper/main.py, once job.status reflects the real result.
         """
         if self.ejected:
             logging.debug("The drive associated with this job has already been ejected.")
@@ -313,7 +318,12 @@ class Job(db.Model):
         if self.drive is None:
             logging.warning("No drive was backpopulated with this job!")
             return
-        if not cfg.arm_config['AUTO_EJECT']:
+        auto_eject = cfg.arm_config['AUTO_EJECT']
+        if isinstance(auto_eject, str) and auto_eject.lower() == "on-success":
+            should_eject = self.status == JobState.SUCCESS.value
+        else:
+            should_eject = bool(auto_eject)
+        if not should_eject:
             logging.info("Skipping auto eject")
             self.drive.release_current_job()  # release job without ejecting
             return

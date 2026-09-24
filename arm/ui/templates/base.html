@@ -27,6 +27,32 @@
                     </svg>
                 </button>
                 <span id="notificationview">{% include 'navnotify.html' %}</span>
+                {% if header_drives %}
+                    {% if header_drives|length == 1 %}
+                        <a href="/drive/eject/{{ header_drives[0].drive_id }}" class="icon-btn"
+                           data-bs-toggle="tooltip" data-bs-placement="bottom"
+                           title="Eject {{ header_drives[0].name or 'drive' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                <path d="M1 12.5a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 0 1h-13a.5.5 0 0 1-.5-.5m6.646-8.854a.5.5 0 0 1 .708 0l3.5 3.5a.5.5 0 0 1-.708.708L8 4.707 4.854 7.854a.5.5 0 1 1-.708-.708z"/>
+                            </svg>
+                        </a>
+                    {% else %}
+                        <div class="dropdown">
+                            <button type="button" class="icon-btn" id="ejectDropdown" data-bs-toggle="dropdown"
+                                    aria-expanded="false" title="Eject drive">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M1 12.5a.5.5 0 0 1 .5-.5h13a.5.5 0 0 1 0 1h-13a.5.5 0 0 1-.5-.5m6.646-8.854a.5.5 0 0 1 .708 0l3.5 3.5a.5.5 0 0 1-.708.708L8 4.707 4.854 7.854a.5.5 0 1 1-.708-.708z"/>
+                                </svg>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                {% for drive in header_drives %}
+                                    <li><a class="dropdown-item" href="/drive/eject/{{ drive.drive_id }}">
+                                        Eject {{ drive.name or drive.model or ('Drive ' ~ drive.drive_id) }}</a></li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                {% endif %}
                 <button type="button" class="icon-btn" id="restartUi"
                         data-bs-toggle="tooltip" data-bs-placement="bottom" title="Restart ARM UI">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"

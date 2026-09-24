@@ -258,23 +258,6 @@
     gap: .75rem;
 }
 
-.log-terminal-dots {
-    display: flex;
-    gap: .375rem;
-    flex-shrink: 0;
-}
-
-.log-terminal-dots span {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    display: inline-block;
-}
-
-.log-terminal-dots span:nth-child(1) { background-color: #ff5f56; }
-.log-terminal-dots span:nth-child(2) { background-color: #ffbd2e; }
-.log-terminal-dots span:nth-child(3) { background-color: #27c93f; }
-
 .log-terminal-title {
     color: rgba(255, 255, 255, .55);
     font-family: var(--bs-font-monospace);
