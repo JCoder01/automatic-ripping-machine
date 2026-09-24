@@ -1,29 +1,23 @@
 {#
-    Progress/stage/ETA block for one job. Used two ways, both providing a
-    `job` dict shaped by json_api.py's build_job_result(): inline inside a
-    _joblist_cards.html card (one entry of get_x_jobs()'s `results` dict),
-    and as the swap target of jobdetail.html's own polling region (the
-    `result` of json_api.get_job(), see feed_json's mode == 'job' handling).
+    Progress/stage/ETA block for one job, included inline inside a
+    _joblist_cards.html card. `job` is one entry from json_api.get_x_jobs()'s
+    `results` dict.
 #}
 {% set show_progress = (job.status == "transcoding" and job.stage and job.progress)
     or (job.status == "ripping" and job.stage and job.progress)
     or (job.disctype == "music" and job.stage) %}
 {% if show_progress %}
-    <div id="jobId{{ job.job_id }}_stage"><strong>Stage:</strong> {{ job.stage|safe }}</div>
-    <div id="jobId{{ job.job_id }}_progress">
-        <div class="progress">
-            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar"
+    <div class="small mb-1">{{ job.stage|safe }}</div>
+    <div class="d-flex align-items-center gap-2 mb-1">
+        <div class="progress flex-grow-1" style="height: 8px;">
+            <div class="progress-bar" role="progressbar"
                  aria-valuenow="{{ job.progress_round }}" aria-valuemin="0" aria-valuemax="100"
-                 style="width: {{ job.progress_round }}%">
-                <small class="justify-content-center d-flex position-absolute w-100" style="color: black; z-index: 2;">{{ job.progress }}%</small>
-            </div>
+                 style="width: {{ job.progress_round }}%"></div>
         </div>
+        <span class="small text-muted" style="min-width: 3em;">{{ job.progress }}%</span>
     </div>
-    <div id="jobId{{ job.job_id }}_eta"><strong>ETA:</strong> {{ job.eta }}</div>
-    {% if job.cur_fps is defined and job.cur_fps not in (none, "-1") %}
-        <div id="jobId{{ job.job_id }}_cur_fps"><strong>CUR FPS:</strong> {{ job.cur_fps }}</div>
-    {% endif %}
-    {% if job.avg_fps is defined and job.avg_fps not in (none, "-1") %}
-        <div id="jobId{{ job.job_id }}_avg_fps"><strong>AVG FPS:</strong> {{ job.avg_fps }}</div>
-    {% endif %}
+    <div class="small text-muted">
+        {% if job.eta and job.eta != "Unknown" %}{{ job.eta }} remaining{% else %}ETA unknown{% endif %}
+        {% if job.cur_fps is defined and job.cur_fps not in (none, "-1") %} · {{ job.cur_fps }} fps{% endif %}
+    </div>
 {% endif %}

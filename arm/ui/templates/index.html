@@ -4,14 +4,9 @@
     {% extends "support/base_simple.html" %}
 {% endif %}
 {% block content %}
-    <div class="row">
-        <div class="col-12 rounded text-center">
-            <img src="/static/img/arm80.png" alt="Automatic Ripping Machine">
-            <h2>Welcome to your Automatic Ripping Machine</h2>
-        </div>
-    </div>
+    <h2 class="mb-4">Dashboard</h2>
 
-    <div class="row g-4 mt-1">
+    <div class="row g-4">
         <div class="col-lg-8">
             <div id="joblist"
                  hx-get="/json?mode=joblist" hx-trigger="load, every {{ armui_cfg['index_refresh'] }}ms" hx-swap="innerHTML">
