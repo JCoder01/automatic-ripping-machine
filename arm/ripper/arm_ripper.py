@@ -280,6 +280,22 @@ def rip_with_mkv(current_job, protection=0):
     return mkv_ripped
 
 
+def uses_manual_track_selection(current_job, protection=0):
+    """
+    Test to check if the user picks this job's tracks (manual mode) before it's ripped\n
+    Only applies when the tracks get ripped one at a time by MakeMKV - not for
+    mainfeature or backup rips, or discs that don't go through MakeMKV at all.\n
+    :param current_job: current job
+    :param protection: If the disc have 99 track protection
+    :return: Bool
+    """
+    return (current_job.manual_mode
+            and current_job.disctype in ("dvd", "bluray")
+            and rip_with_mkv(current_job, protection)
+            and not current_job.config.MAINFEATURE
+            and (current_job.config.RIPMETHOD == "mkv" or current_job.disctype == "dvd"))
+
+
 def skip_transcode_movie(files, job, raw_path):
     """
     Only ran if job is a movie - find the largest file use it as mainfeature\n

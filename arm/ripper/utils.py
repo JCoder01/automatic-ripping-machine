@@ -551,6 +551,86 @@ def rip_data(job):
     return success
 
 
+def _check_free_space_for_iso(job, iso_path):
+    """
+    Best-effort preflight check that RAW_PATH has room for a full-disc ISO
+    before starting a potentially multi-hour ddrescue run, so a doomed copy
+    fails fast instead of hitting ENOSPC near the end.\n
+    :param job: Current job (job.devpath is the source optical drive)
+    :param iso_path: Destination .iso file path
+    :raises RipperException: if there isn't enough free space
+    """
+    try:
+        source_size = int(subprocess.check_output(
+            ["blockdev", "--getsize64", job.devpath]).decode("utf-8").strip())
+    except (subprocess.CalledProcessError, OSError, ValueError) as err:
+        logging.warning(f"Could not determine the size of {job.devpath} to preflight disk space: {err}")
+        return
+    free = shutil.disk_usage(os.path.dirname(iso_path)).free
+    if free < source_size:
+        raise RipperException(
+            f"Not enough free space for a rescued ISO: {os.path.dirname(iso_path)} has "
+            f"{free} bytes free, but {job.devpath} is {source_size} bytes")
+
+
+def rescue_disc_to_iso(job, iso_path):
+    """
+    Tolerant block-level copy of the disc at job.devpath to iso_path using ddrescue,
+    for the "Rip via ISO" retry (see arm/ripper/rip_iso.py).\n
+    Unlike plain dd, ddrescue retries flaky reads with backoff and skips forward past
+    a stuck block instead of hanging on it indefinitely - the failure mode seen on a
+    marginal drive/disc where MakeMKV itself got stuck on a single bad block.\n
+    :param job: Current job
+    :param iso_path: Destination .iso file path
+    :return: iso_path
+    :raises RipperException: if ddrescue failed outright and recovered nothing usable.
+        A nonzero exit with a non-trivial amount of data written is NOT treated as
+        fatal here - that's the expected outcome for a marginal disc, and it's left
+        to MakeMKV/the rest of the pipeline to judge whether what was recovered is
+        actually usable.
+    """
+    make_dir(os.path.dirname(iso_path))
+    _check_free_space_for_iso(job, iso_path)
+    mapfile = f"{iso_path}.mapfile"
+    logfile = os.path.join(job.config.LOGPATH, job.logfile)
+    extra_args = cfg.arm_config["ISO_RESCUE_PARAMETERS"]
+    cmd = f'ddrescue -b 2048 -r3 {extra_args} "{job.devpath}" "{iso_path}" "{mapfile}" >> "{logfile}" 2>&1'
+    logging.info(f"Rescuing disc {job.devpath} to {iso_path}")
+    logging.debug(f"Sending command: {cmd}")
+    result = subprocess.run(cmd, shell=True, check=False)
+    iso_size = os.path.getsize(iso_path) if os.path.exists(iso_path) else 0
+    if result.returncode != 0 and iso_size < 1024 * 1024:
+        raise RipperException(
+            f"ddrescue failed (exit code {result.returncode}) and recovered no usable data. "
+            f"See {logfile} for details.")
+    if result.returncode != 0:
+        logging.warning(
+            f"ddrescue exited with code {result.returncode} - some sectors may be unrecovered. "
+            f"Continuing since {iso_size} bytes were written to {iso_path}. See {mapfile} for the map "
+            "of what was/wasn't recovered.")
+    else:
+        logging.info(f"ddrescue completed successfully: {iso_size} bytes written to {iso_path}")
+    return iso_path
+
+
+def delete_iso(iso_path):
+    """
+    Delete a rescued ISO (and its ddrescue mapfile) once MakeMKV has successfully
+    extracted from it - mirrors delete_raw_files()'s DELRAWFILES gating, but for a
+    single file rather than a directory (shutil.rmtree, which delete_raw_files uses,
+    can't remove a plain file).\n
+    :param iso_path: Path to the .iso file (its "<iso_path>.mapfile" is removed too)
+    """
+    if not cfg.arm_config["DELRAWFILES"]:
+        return
+    for path in (iso_path, f"{iso_path}.mapfile"):
+        try:
+            os.remove(path)
+            logging.info(f"Removed {path}")
+        except OSError as error:
+            logging.debug(f"No file to remove at {path} - {error}")
+
+
 def set_permissions(directory_to_traverse):
     """
 
@@ -831,8 +911,10 @@ def save_disc_poster(final_directory, job):
 
 def check_for_dupe_folder(have_dupes, hb_out_path, job):
     """
-    Check if the folder already exists
-     if it exists lets make a new one using random numbers
+    Check if the folder already exists\n
+    If ALLOW_DUPLICATES is set, rip into the existing folder, overwriting its
+    contents. Otherwise, if this title isn't a known successful dupe, make a
+    new folder suffixed with the job id instead of overwriting anything.
     :param have_dupes: is this title in the local arm database
     :param hb_out_path: path to HandBrake out
     :param job: Current job
@@ -844,8 +926,13 @@ def check_for_dupe_folder(have_dupes, hb_out_path, job):
         # Or the successful rip of the disc is not found in our database
         logging.debug(f"Value of ALLOW_DUPLICATES: {cfg.arm_config['ALLOW_DUPLICATES']}")
         logging.debug(f"Value of have_dupes: {have_dupes}")
-        if cfg.arm_config["ALLOW_DUPLICATES"] or not have_dupes:
-            hb_out_path = hb_out_path + "_" + job.stage
+        if cfg.arm_config["ALLOW_DUPLICATES"]:
+            # Rip into the existing directory rather than a separate "_<job_id>"
+            # one, so this run's output overwrites any same-named files already
+            # there instead of piling up alongside them.
+            logging.info(f"Duplicate rips are enabled - overwriting files in \"{hb_out_path}\".")
+        elif not have_dupes:
+            hb_out_path = hb_out_path + "_" + str(job.job_id)
             make_dir(hb_out_path, False)
         else:
             # We aren't allowed to rip dupes, notify and exit

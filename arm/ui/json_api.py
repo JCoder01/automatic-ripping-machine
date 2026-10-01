@@ -64,6 +64,7 @@ def build_job_result(job):
     for key, value in job.get_d().items():
         if key != "config":
             result[str(key)] = str(value)
+    result['status_label'] = job.status_label
     return result
 
 
@@ -130,6 +131,9 @@ def process_logfile(logfile, job, job_results):
     """
     app.logger.debug(f"Disc Type: {job.disctype}, Status: {job.status}")
     if job.disctype in {"dvd", "bluray"}:
+        if job.status == JobState.ISO_RIPPING.value:
+            app.logger.debug("using ddrescue")
+            return process_ddrescue_logfile(logfile, job, job_results)
         if job.status == JobState.VIDEO_RIPPING.value:
             app.logger.debug("using mkv - " + logfile)
             return process_makemkv_logfile(job, job_results)
@@ -270,6 +274,54 @@ def process_makemkv_logfile(job, job_results):
         except Exception as error:
             job.stage = f"Unknown -  {error}"
 
+    return job_results
+
+
+def process_ddrescue_logfile(logfile, job, job_results):
+    """
+    Process a ddrescue logfile (see utils.rescue_disc_to_iso, arm/ripper/rip_iso.py)
+    to surface the tolerant disc-to-ISO copy's progress before MakeMKV even starts.\n
+    ddrescue redraws its status block in place (leading \\r + ANSI cursor-up on the
+    first line of each redraw), but every individual field is still its own plain,
+    newline-terminated line - e.g.:
+    \n
+        rescued:     2682 MB,   bad areas:          0,       run time:       5m 2s
+    pct rescued:    6.39%, read errors:          0, remaining time:       1h 13m
+    \n
+    so the same last-line-wins regex approach as the other process_*_logfile()
+    functions works here too.\n
+    :param logfile: the job's own logfile - rescue_disc_to_iso() appends ddrescue's
+        own status output there
+    :param job: the Job class
+    :param job_results: the {} of job status
+    :return: job_results dict
+    """
+    lines = read_log_line(logfile)
+    pct_match = find_last_regex_match(r"pct rescued:\s*(\d+\.\d+)%", lines)
+    remaining_match = find_last_regex_match(r"remaining time:\s*(.+)", lines)
+    rescued_match = find_last_regex_match(r"rescued:\s*([\d.]+\s*[a-zA-Z]*B),\s*bad areas:\s*(\d+)", lines)
+    errors_match = find_last_regex_match(r"read errors:\s*(\d+)", lines)
+
+    if pct_match is not None:
+        job.progress = job_results['progress'] = f"{float(pct_match.group(1)):.2f}"
+        job.progress_round = float(pct_match.group(1))
+    else:
+        app.logger.debug(f"Job [{job.job_id}] ddrescue status not defined - setting progress to 0%")
+        job.progress = job.progress_round = job_results['progress'] = 0
+
+    eta = remaining_match.group(1).strip() if remaining_match is not None else ""
+    job.eta = eta if eta and eta != "n/a" else "Unknown"
+
+    if rescued_match is not None:
+        errors = errors_match.group(1) if errors_match is not None else "0"
+        job.stage = job_results['stage'] = (
+            f"Rescuing disc to ISO - {rescued_match.group(1)} recovered, "
+            f"{rescued_match.group(2)} bad area(s), {errors} read error(s)")
+    else:
+        job.stage = job_results['stage'] = "Rescuing disc to ISO"
+
+    job_results['eta'] = job.eta
+    job_results['progress_round'] = job.progress_round
     return job_results
 
 
@@ -640,6 +692,64 @@ def retry_transcode(job_id):
     job.status = JobState.TRANSCODE_ACTIVE.value
     notification = Notifications(f"Job: {job.title} transcode retry started",
                                  'Retrying the transcode step using the previously ripped files.')
+    db.session.add(notification)
+    db.session.commit()
+    json_return['success'] = True
+    return json_return
+
+
+def rip_via_iso(job_id):
+    """
+    json api - retry a job that failed during MakeMKV's rip by first making a tolerant
+    ddrescue copy of the disc to an ISO, then ripping/transcoding from that instead of
+    the raw device\n
+    Launches arm/ripper/rip_iso.py as its own process, the same way udev launches
+    arm/ripper/main.py for a fresh rip, since the ddrescue copy plus rip/transcode is a
+    long-running subprocess call that shouldn't run inside the UI's own process.\n
+    :param str job_id: the job id
+    :return: json/dict
+    """
+    json_return = {
+        'success': False,
+        'job': job_id,
+        'mode': 'rip_via_iso'
+    }
+    if not job_id_validator(job_id):
+        notification = Notifications(f"Job: {job_id} isn't a valid job!",
+                                     f'Job with id: {job_id} doesnt match anything in the database')
+        db.session.add(notification)
+        db.session.commit()
+        return json_return
+
+    job = Job.query.get(int(job_id))
+    if job.status != JobState.FAILURE.value:
+        json_return['error'] = "Job isn't in a retryable state"
+        return json_return
+    if job.disctype not in ("dvd", "bluray"):
+        json_return['error'] = "Rip via ISO only supports dvd/bluray jobs"
+        return json_return
+    if job.config.RIPMETHOD != "mkv":
+        json_return['error'] = "Rip via ISO only supports RIPMETHOD \"mkv\" for now"
+        return json_return
+
+    script = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                          'ripper', 'rip_iso.py')
+    try:
+        subprocess.Popen(
+            [sys.executable, script, '--job-id', str(job.job_id)],
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as err:
+        app.logger.error(f"Error launching rip-via-ISO retry for job {job_id}: {err}")
+        json_return['error'] = str(err)
+        return json_return
+
+    job.status = JobState.ISO_RIPPING.value
+    notification = Notifications(f"Job: {job.title} rip-via-ISO retry started",
+                                 'Rescuing the disc to an ISO before retrying the rip. '
+                                 'Make sure the disc is back in the drive.')
     db.session.add(notification)
     db.session.commit()
     json_return['success'] = True

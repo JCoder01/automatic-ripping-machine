@@ -87,6 +87,14 @@
                                 hx-swap="none"
                                 hx-on::after-request="if(event.detail.successful) location.reload()">Retry Transcode
                         </button>
+                    {% elif job.status == 'fail' and job.disctype in ('dvd', 'bluray') %}
+                        <button type="button" class="btn btn-warning btn-sm"
+                                hx-get="/json?job={{ job.job_id }}&mode=rip_via_iso"
+                                hx-confirm="Make sure the disc is back in the drive. ARM will first make a tolerant copy of the whole disc to an ISO (this can take a long time and a lot of disk space), then retry the rip from that. Continue?"
+                                data-confirm-title="Rip via ISO?"
+                                hx-swap="none"
+                                hx-on::after-request="if(event.detail.successful) location.reload()">Rip via ISO
+                        </button>
                     {% endif %}
                 </td>
             </tr>

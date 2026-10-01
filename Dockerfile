@@ -46,6 +46,10 @@ RUN \
     echo "/dev/sr20  /mnt/dev/sr20  udf,iso9660  defaults,users,utf8,ro  0  0" >> /etc/fstab
 
 
+# ddrescue, for the "Rip via ISO" tolerant-retry workflow (arm/ripper/rip_iso.py)
+RUN apt-get update && apt-get install -y --no-install-recommends gddrescue \
+    && rm -rf /var/lib/apt/lists/*
+
 # Remove SSH
 RUN rm -rf /etc/service/sshd /etc/my_init.d/00_regen_ssh_host_keys.sh
 
@@ -79,8 +83,8 @@ FROM base AS automatic-ripping-machine
 # before it can be rechowned, which is slow. Left at the historical default
 # (1000) so a plain `docker build .` with no extra args behaves exactly as
 # before for anyone whose deployment also defaults to 1000:1000.
-ARG ARM_UID=1000
-ARG ARM_GID=1000
+ARG ARM_UID=568
+ARG ARM_GID=568
 
 # Copy over source code
 # --chown correctly covers everything COPY places inside /opt/arm/, but not

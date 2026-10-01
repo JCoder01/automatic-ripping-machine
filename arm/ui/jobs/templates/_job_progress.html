@@ -5,6 +5,7 @@
 #}
 {% set show_progress = (job.status == "transcoding" and job.stage and job.progress)
     or (job.status == "ripping" and job.stage and job.progress)
+    or (job.status == "iso_ripping" and job.stage and job.progress)
     or (job.disctype == "music" and job.stage) %}
 {% if show_progress %}
     <div class="small mb-1">{{ job.stage|safe }}</div>

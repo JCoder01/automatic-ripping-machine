@@ -25,10 +25,10 @@ if find_spec("arm") is None:
 
 import arm.config.config as cfg  # noqa E402
 from arm.models.config import Config  # noqa: E402
-from arm.models.job import Job, JobState  # noqa: E402
+from arm.models.job import MANUAL_START_SIGNAL, Job, JobState  # noqa: E402
 from arm.models.system_drives import CDS, SystemDrives  # noqa: E402
 from arm.ripper import (arm_ripper, identify, logger,  # noqa: E402
-                        music_brainz, utils)
+                        makemkv, music_brainz, utils)
 from arm.ripper.ARMInfo import ARMInfo  # noqa E402
 from arm.ui import app, constants, db  # noqa E402
 from arm.ui.settings import DriveUtils as drive_utils  # noqa E402
@@ -106,6 +106,7 @@ def check_fstab():
 def main():
     """main disc processing function"""
     logging.info("Starting Disc identification")
+    utils.database_updater({"status": JobState.IDENTIFYING.value}, job)
     identify.identify(job)
 
     # Check db for entries matching the crc and successful
@@ -113,8 +114,12 @@ def main():
     logging.debug(f"Value of have_dupes: {have_dupes}")
 
     utils.notify_entry(job)
-    # Check if user has manual wait time enabled
-    utils.check_for_wait(job)
+    if arm_ripper.uses_manual_track_selection(job, job.has_track_99):
+        # Scan the tracks now and wait for the user to pick them (and fix the title)
+        makemkv.manual_select_tracks(job)
+    else:
+        # Check if user has manual wait time enabled
+        utils.check_for_wait(job)
 
     log_arm_params(job)
     check_fstab()
@@ -163,6 +168,9 @@ def setup():
     # Handle SIGTERM so we can exit gracefully. Without this, no except: or finally: blocks are
     # run and the program exits immediately, potentially leaving the database in an invalid state.
     signal(SIGTERM, signal_handler)
+    # The UI sends this to wake a manual-mode job waiting on track selection (see
+    # makemkv.wait_for_manual_start) - make sure it's harmless if it ever lands outside that wait.
+    signal(MANUAL_START_SIGNAL, lambda _signal, _frame_type: None)
 
     # Get arguments from arg parser
     args = entry()

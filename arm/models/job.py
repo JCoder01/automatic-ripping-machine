@@ -3,6 +3,7 @@ import logging
 import os
 import psutil
 import pyudev
+import signal
 import subprocess
 
 from datetime import datetime as dt
@@ -16,6 +17,11 @@ import arm.config.config as cfg
 # THESE IMPORTS ARE REQUIRED FOR THE db.Relationships to work
 from arm.models.track import Track  # noqa: F401
 from arm.models.config import Config  # noqa: F401
+
+# Sent by the UI to a manual-mode job's ripper process the moment the user submits
+# their track selection, so the ripper starts right away instead of on its next poll
+# (see Job.wake_for_manual_start and makemkv.wait_for_manual_start).
+MANUAL_START_SIGNAL = signal.SIGUSR1
 
 
 def _disc_dir_exists(mountpoint, name):
@@ -59,6 +65,8 @@ class JobState(str, enum.Enum):
     MANUAL_WAIT_STARTED = "waiting"
 
     # Job Initialized or Pending
+    IDENTIFYING = "identifying"
+    """The disc is being mounted, identified and checked against earlier rips."""
     IDLE = "active"
     """An Idle Job may proceed to ripping or to finished.
 
@@ -70,10 +78,15 @@ class JobState(str, enum.Enum):
     # Video Ripping States
     VIDEO_RIPPING = "ripping"
     """Indicate that makemkv is ripping."""
-    VIDEO_WAITING = "waiting"
-    """Indicate that the job waits for user input or for the next queue slot."""
+    VIDEO_WAITING = "queued"
+    """Indicate that the job waits for its turn to run makemkvcon (see MAX_CONCURRENT_MAKEMKVINFO).
+    Deliberately not the same value as MANUAL_WAIT_STARTED - equal values make an Enum
+    treat the two as one state, and waiting for the user is not waiting for a queue slot."""
     VIDEO_INFO = "info"
     """Indicate that the job calls makemkv info"""
+    ISO_RIPPING = "iso_ripping"
+    """Indicate that a tolerant ddrescue copy of the disc to an ISO is in progress
+    (see arm/ripper/rip_iso.py), ahead of a normal MakeMKV rip from that ISO."""
 
     # Audio ripping states
     AUDIO_RIPPING = "ripping"
@@ -93,11 +106,28 @@ JOB_STATUS_FINISHED = {
     JobState.TRANSCODE_FAILED,
 }
 JOB_STATUS_RIPPING = {
+    JobState.IDENTIFYING,
     JobState.AUDIO_RIPPING,
     JobState.VIDEO_RIPPING,
     JobState.MANUAL_WAIT_STARTED,  # <-- not ripping, but undistinguishable
     JobState.VIDEO_WAITING,
     JobState.VIDEO_INFO,
+    JobState.ISO_RIPPING,
+}
+# What the UI shows for each status - see Job.status_label
+JOB_STATUS_LABELS = {
+    JobState.SUCCESS: "Complete",
+    JobState.FAILURE: "Failed",
+    JobState.TRANSCODE_FAILED: "Transcode failed",
+    JobState.MANUAL_WAIT_STARTED: "Waiting for title override",
+    JobState.IDENTIFYING: "Identifying disc",
+    JobState.IDLE: "Preparing",
+    JobState.VIDEO_RIPPING: "Ripping",
+    JobState.VIDEO_WAITING: "Waiting for a free MakeMKV slot",
+    JobState.VIDEO_INFO: "Scanning disc for titles",
+    JobState.ISO_RIPPING: "Copying disc to ISO",
+    JobState.TRANSCODE_ACTIVE: "Transcoding",
+    JobState.TRANSCODE_WAITING: "Waiting to transcode",
 }
 JOB_STATUS_TRANSCODING = {
     JobState.TRANSCODE_ACTIVE,
@@ -156,6 +186,11 @@ class Job(db.Model):
     """Staging directory HandBrake/FFmpeg should transcode into, computed once at
     rip time so a transcode retry writes to the same place instead of racing
     check_for_dupe_folder into creating a second, differently-suffixed folder."""
+    iso_path = db.Column(db.String(256))
+    """Path to a tolerant ddrescue copy of the disc, made by the "Rip via ISO"
+    retry (see arm/ripper/rip_iso.py) when the original MakeMKV read failed.
+    Only set while that retry is in progress - cleared once MakeMKV has
+    successfully extracted from the ISO."""
     ejected = db.Column(db.Boolean)
     updated = db.Column(db.Boolean)
     pid = db.Column(db.Integer)
@@ -237,6 +272,25 @@ class Job(db.Model):
         process_id = psutil.Process(pid)
         self.pid = pid
         self.pid_hash = hash(process_id)
+
+    def wake_for_manual_start(self):
+        """
+        Wake this job's ripper process out of its manual-mode wait now that
+        manual_start is set. Best effort - if it fails, the ripper still picks
+        manual_start up on its next database poll.
+        :return: None
+        """
+        if self.pid is None:
+            return
+        try:
+            process = psutil.Process(self.pid)
+            # Guard against the pid having been reused by some unrelated process
+            if hash(process) != self.pid_hash:
+                logging.warning(f"Job {self.job_id}: PID {self.pid} no longer belongs to its ripper, not signalling")
+                return
+            process.send_signal(MANUAL_START_SIGNAL)
+        except psutil.Error as err:
+            logging.warning(f"Job {self.job_id}: couldn't signal ripper PID {self.pid}: {err}")
 
     def get_disc_type(self, found_hvdvd_ts):
         """
@@ -342,6 +396,19 @@ class Job(db.Model):
     @finished.expression
     def finished(cls):
         return cls.status.in_([js.value for js in JOB_STATUS_FINISHED])
+
+    @property
+    def status_label(self):
+        """Human readable version of status, for display in the UI"""
+        try:
+            state = JobState(self.status)
+        except ValueError:
+            return str(self.status)
+        if state == JobState.MANUAL_WAIT_STARTED and self.manual_mode and not self.manual_start:
+            return "Waiting for your input - select tracks"
+        if state == JobState.VIDEO_RIPPING and self.disctype == "music":
+            return "Ripping audio"
+        return JOB_STATUS_LABELS[state]
 
     @property
     def idle(self):

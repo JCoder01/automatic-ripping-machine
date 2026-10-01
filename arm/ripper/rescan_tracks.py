@@ -58,7 +58,12 @@ def rescan(job_id, min_length):
     Track.query.filter_by(job_id=job.job_id).delete()
     db.session.commit()
 
-    makemkv.get_track_info(job.drive.mdisc, job)
+    try:
+        makemkv.get_track_info(job.drive.mdisc, job)
+    finally:
+        # makemkv_info() leaves the job marked as ripping - put it back to waiting
+        # so the UI still offers track selection
+        utils.database_updater({"status": JobState.MANUAL_WAIT_STARTED.value}, job)
 
 
 if __name__ == "__main__":

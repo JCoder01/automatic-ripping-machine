@@ -26,9 +26,7 @@
                         </h6>
                         <div class="text-muted small mb-2">
                             {{ job.video_type }} &middot; {{ job.year }} &middot; {{ job.devpath }}
-                            {% if job.status not in ("transcoding", "ripping") %}
-                                &middot; <span class="{{ 'text-success' if job.status == 'success' else 'text-danger' if job.status in ('fail', 'transcode_failed') else '' }}">{{ job.status }}</span>
-                            {% endif %}
+                            &middot; <span class="{{ 'text-success' if job.status == 'success' else 'text-danger' if job.status in ('fail', 'transcode_failed') else 'text-warning' if job.status_label.startswith('Waiting for your') else '' }}">{{ job.status_label }}</span>
                         </div>
 
                         {% include "_job_progress.html" %}

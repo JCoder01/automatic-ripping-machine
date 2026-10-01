@@ -54,6 +54,7 @@ FRAGMENT_TEMPLATES = {
     'delete': '_empty.html',
     'fixperms': '_empty.html',
     'retry_transcode': '_empty.html',
+    'rip_via_iso': '_empty.html',
     'send_item': '_send_item_card.html',
     'change_job_params': '_empty.html',
     # jobdetail.html's own progress section (json_api.get_job) - unlike the
@@ -232,11 +233,12 @@ def jobdetail_load():
                 db_track.process = checkbox_value
                 db.session.commit()
 
-        # Set job to ready
+        # Set job to ready, and wake the ripper so it starts now rather than on its next poll
         job.manual_start = True
         db.session.commit()
+        job.wake_for_manual_start()
         app.logger.debug(f"Setting [{job.job_id}] to [{job.manual_start}], lets get ripping")
-        flash("Tracks was updated", "success")
+        flash("Tracks were updated - starting the rip", "success")
 
     return redirect(url_for('route_jobs.jobdetail', job_id=job_id))
 
@@ -439,6 +441,7 @@ def feed_json():
             'delete': {'funct': json_api.delete_job, 'args': ('j_id', 'mode')},
             'abandon': {'funct': json_api.abandon_job, 'args': ('j_id',)},
             'retry_transcode': {'funct': json_api.retry_transcode, 'args': ('j_id',)},
+            'rip_via_iso': {'funct': json_api.rip_via_iso, 'args': ('j_id',)},
             'full': {'funct': json_api.generate_log, 'args': ('logpath', 'j_id')},
             'search': {'funct': json_api.search, 'args': ('searchq',)},
             'getfailed': {

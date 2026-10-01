@@ -16,12 +16,13 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
-from time import sleep, time
+from time import monotonic, sleep, time
 
 import arm.config.config as cfg
 from arm.models import SystemDrives, Track
-from arm.models.job import JobState
+from arm.models.job import MANUAL_START_SIGNAL, Job, JobState
 from arm.ripper import utils
 from arm.ripper.utils import notify
 from arm.ui import db
@@ -155,6 +156,11 @@ class MessageID(enum.IntEnum):
     Please purchase an activation key if you've found this application useful.
     You may still use all free functionality without any restrictions.
     """
+    KEY_EXPIRED = 5073
+    """Your temporary key has expired and was removed. Please restart the application.
+    The free beta key ARM fetches from the MakeMKV forum (scripts/update_key.sh) is
+    only valid for a limited time, usually until the end of the month.
+    """
     EVALUATION_PERIOD_EXPIRED_APP_TOO_OLD = 5021
     """This application version is too old.  Please download the latest version
     at http://www.makemkv.com/ or enter a registration key to continue using
@@ -166,6 +172,10 @@ class MessageID(enum.IntEnum):
     RIP_BACKUP_FAILED_PRE = 5096
     RIP_BACKUP_FAILED = 5080
     """Backup Mode Failed."""
+
+
+KEY_EXPIRED_CODES = frozenset({MessageID.KEY_EXPIRED, MessageID.EVALUATION_PERIOD_EXPIRED_APP_TOO_OLD})
+"""MakeMKV messages meaning it has no valid key (see MakeMkvKeyExpiredError)"""
 
 
 class StreamID(enum.IntEnum):
@@ -597,6 +607,9 @@ def makemkv_info(job, select=None, index=9999, options=None):
     info_options = ["info", "--cache=1"] + options + [f"disc:{index:d}", f"--minlength={utils.min_length_for(job)}"]
     wait_time = job.config.MANUAL_WAIT_TIME
     max_processes = cfg.arm_config["MAX_CONCURRENT_MAKEMKVINFO"]
+    # Put the job back in whatever state it was in before - e.g. still "ripping" for the
+    # rescan a rip does, but not for a manual mode scan that is about to wait for the user
+    previous_status = job.status
     job.status = JobState.VIDEO_WAITING.value
     db.session.commit()
     utils.sleep_check_process("makemkvcon", max_processes, sleep=(10, wait_time, 10))
@@ -606,17 +619,33 @@ def makemkv_info(job, select=None, index=9999, options=None):
         yield from run(info_options, select)
     finally:
         logging.info("MakeMKV info exits.")
-        job.status = JobState.VIDEO_WAITING.value
-        db.session.commit()
-        if max_processes:
+        # The cooldown only exists for other jobs queued behind this one - when this is the
+        # only job there is nobody to give a turn to, so don't hold it up (or report it as
+        # waiting for a slot)
+        if max_processes and other_jobs_active(job):
+            job.status = JobState.VIDEO_WAITING.value
+            db.session.commit()
             logging.info(f"Penalty {wait_time}s")
             # makemkvcon info tends to crash makemkvcon backup|mkv
             # give other processes time to use this function.
             sleep(wait_time)
-        # sleep here until all processes finish (hopefully)
-        utils.sleep_check_process("makemkvcon", max_processes, sleep=wait_time)
-        job.status = JobState.VIDEO_RIPPING.value
+            # sleep here until all processes finish (hopefully)
+            utils.sleep_check_process("makemkvcon", max_processes, sleep=wait_time)
+        job.status = previous_status
         db.session.commit()
+
+
+def other_jobs_active(job):
+    """
+    Is any other job still unfinished? Those are the ones that may be waiting for
+    their own turn to run makemkvcon
+
+    Parameters:
+        job: arm.models.job.Job
+    Returns:
+        bool
+    """
+    return db.session.query(Job.job_id).filter(~Job.finished, Job.job_id != job.job_id).first() is not None
 
 
 def get_drives(job):
@@ -654,75 +683,74 @@ def makemkv_backup(job, rawpath):
     collections.deque(run(cmd, OutputType.MSG), maxlen=0)
 
 
-def makemkv_mkv(job, rawpath):
+def makemkv_mkv(job, rawpath, source=None, rescan=True):
     """
     Rip Blu-ray without enhanced protection or dvd disc
 
     Parameters:
         job: arm.models.job.Job
         rawpath:
+        source: MakeMKV source spec, e.g. "dev:/dev/sr0" or "iso:/path/to.iso".
+            Defaults to the job's own optical drive (``dev:{job.devpath}``) -
+            pass an ``iso:`` spec to rip from a ddrescue'd image instead (see
+            arm/ripper/rip_iso.py).
+        rescan: Whether to re-run MakeMKV's disc info scan (get_track_info).
+            Only meaningful with the default ``dev:`` source - a retry from
+            an already-known-good ISO (source given, rescan=False) reuses
+            job.tracks and the track.process selections from the original
+            scan instead of re-querying the (possibly still-unreadable)
+            physical disc.
     """
-    # Get drive mode for the current drive
-    mode = utils.get_drive_mode(job.devpath)
-    logging.info(f"Job running in {mode} mode")
-    # Get track info form mkv rip
-    get_track_info(job.drive.mdisc, job)
+    if source is None:
+        source = f"dev:{job.devpath}"
+    # Manual mode jobs were already scanned, and had their tracks picked by the
+    # user, up front - see manual_select_tracks()
+    if rescan and not job.manual_start:
+        # Get track info form mkv rip
+        get_track_info(job.drive.mdisc, job)
     # route to ripping functions.
-    if job.config.MAINFEATURE:
+    if job.manual_start:
+        logging.info("Ripping the tracks selected in manual mode")
+        process_single_tracks(job, rawpath, 'manual', source=source)
+    elif job.config.MAINFEATURE:
         logging.info("Trying to find mainfeature (sorting by chapters desc, filesize desc, track_number asc)")
         track = Track.query.filter_by(job_id=job.job_id).order_by(
             Track.chapters.desc(), Track.filesize.desc(), Track.track_number.asc()).first()
-        rip_mainfeature(job, track, rawpath)
-    elif mode == 'manual':  # Run if mode is manual, user selects tracks
-        # Set job status to waiting
-        job.status = JobState.VIDEO_WAITING.value
-        db.session.commit()
-        # Process Tracks
-        if manual_wait(job):  # Alert user: tracks are ready and wait for 30 minutes
-            # Response from user provided, process requested tracks
-            job.status = JobState.VIDEO_RIPPING.value
-            db.session.commit()
-            process_single_tracks(job, rawpath, mode)
-        else:
-            # Notify User: no action was taken
-            title = "ARM is Sad - Job Abandoned"
-            message = "You left me alone in the cold and dark, I forgot who I was. Your job has been abandoned."
-            notify(job, title, message)
-
-            raise utils.RipperException("Manual mode: Timed out waiting for user input")
-
-    # if no maximum length, process the whole disc in one command
-    elif int(job.config.MAXLENGTH) > 99998:
+        rip_mainfeature(job, track, rawpath, source=source)
+    # if no maximum length, process the whole disc in one command - only on the
+    # original scan (rescan=True); a retry (rescan=False) must stick to the
+    # already-decided track.process selections via the 'retry' branch below,
+    # not re-derive "rip everything" just because mainfeature didn't apply.
+    elif rescan and int(job.config.MAXLENGTH) > 99998:
         cmd = [
             "mkv",
         ]
         cmd += shlex.split(job.config.MKV_ARGS)
         cmd += [
             f"--progress={progress_log(job)}",
-            f"dev:{job.devpath}",
+            source,
             "all",
             rawpath,
             f"--minlength={utils.min_length_for(job)}",
         ]
         logging.info("Process all tracks from disc.")
         collections.deque(run(cmd, OutputType.MSG), maxlen=0)
+    elif rescan:
+        process_single_tracks(job, rawpath, 'auto', source=source)
     else:
-        process_single_tracks(job, rawpath, 'auto')
+        # No live drive-mode/manual-wait to consult - reuse the track.process
+        # selections already persisted by the original scan/manual selection.
+        process_single_tracks(job, rawpath, 'retry', source=source)
 
 
-def makemkv(job):
+def set_disc_index(job):
     """
-    Rip Blu-rays/DVDs with MakeMKV
+    Make sure job.drive.mdisc holds MakeMKV's disc number for the job's drive,
+    querying MakeMKV for it (and storing every drive's number) if not known yet
 
     Parameters:
         job: arm.models.job.Job
-    Returns:
-        str: path to ripped files.
     """
-    # confirm MKV is working, beta key hasn't expired
-    prep_mkv()
-    logging.info(f"Starting MakeMKV rip. Method is {job.config.RIPMETHOD}")
-    # get MakeMKV disc number
     # Fix: Check if job.drive is None before accessing job.drive.mdisc
     if job.drive is None or job.drive.mdisc is None:
         logging.debug("Storing new MakeMKV disc numbers to database.")
@@ -745,6 +773,21 @@ def makemkv(job):
             else:
                 logging.error(f"Could not find drive for {job.devpath}")
                 raise ValueError(f"No drive found for device {job.devpath}")
+
+
+def makemkv(job):
+    """
+    Rip Blu-rays/DVDs with MakeMKV
+
+    Parameters:
+        job: arm.models.job.Job
+    Returns:
+        str: path to ripped files.
+    """
+    # confirm MKV is working, beta key hasn't expired
+    prep_mkv()
+    logging.info(f"Starting MakeMKV rip. Method is {job.config.RIPMETHOD}")
+    set_disc_index(job)
     logging.info(f"MakeMKV disc number: {job.drive.mdisc:d}")
     # get filesystem in order
     rawpath = setup_rawpath(job, os.path.join(str(job.config.RAW_PATH), str(job.title)))
@@ -762,14 +805,17 @@ def makemkv(job):
     return rawpath
 
 
-def rip_mainfeature(job, track, rawpath):
+def rip_mainfeature(job, track, rawpath, source=None):
     """
     Find and rip only the main feature when using Blu-rays
 
     Parameters:
         job: arm.models.job.Job
         track: arm.models.track.Track
+        source: MakeMKV source spec (default: ``dev:{job.devpath}``) - see makemkv_mkv()
     """
+    if source is None:
+        source = f"dev:{job.devpath}"
     logging.info(f"Processing track#{track.track_number} as mainfeature. Length is {track.length}s")
     filepathname = os.path.join(rawpath, track.filename)
     logging.info(f"Ripping track#{track.track_number} to {shlex.quote(filepathname)}")
@@ -779,7 +825,7 @@ def rip_mainfeature(job, track, rawpath):
     cmd += shlex.split(job.config.MKV_ARGS)
     cmd += [
         f"--progress={progress_log(job)}",
-        f"dev:{job.devpath}",
+        source,
         track.track_number,
         rawpath,
         f"--minlength={utils.min_length_for(job)}",
@@ -789,15 +835,20 @@ def rip_mainfeature(job, track, rawpath):
     collections.deque(run(cmd, OutputType.MSG), maxlen=0)
 
 
-def process_single_tracks(job, rawpath, mode: str):
+def process_single_tracks(job, rawpath, mode: str, source=None):
     """
     Process single tracks by MakeMKV one at a time
 
     Parameters:
         job: arm.models.job.Job
         rawpath:
-        mode: drive mode (auto or manual)
+        mode: 'auto' recomputes each track.process from length thresholds;
+            any other value (e.g. 'manual', 'retry') reuses whatever
+            track.process is already persisted.
+        source: MakeMKV source spec (default: ``dev:{job.devpath}``) - see makemkv_mkv()
     """
+    if source is None:
+        source = f"dev:{job.devpath}"
     # process one track at a time based on track length
     if mode == 'auto':
         # Process single track automatically based on start and finish times
@@ -835,7 +886,7 @@ def process_single_tracks(job, rawpath, mode: str):
         cmd += [
             f"--minlength={utils.min_length_for(job)}",
             f"--progress={logfile_base}",
-            f"dev:{job.devpath}",
+            source,
             track.track_number,
             rawpath,
         ]
@@ -868,22 +919,27 @@ def setup_rawpath(job, raw_path):
     """
 
     logging.info(f"Destination is {raw_path}")
-    if not os.path.exists(raw_path):
+    base_path = raw_path
+    attempt = 0
+    while True:
         try:
             os.makedirs(raw_path)
-        except OSError:
+            return raw_path
+        except FileExistsError:
+            # job.stage is a free-text UI progress string (e.g. "Preparing" or
+            # "Track 3/1<br>Analyzing seamless segments") that gets overwritten
+            # throughout the job's life - never use it as a path disambiguator.
+            # job.job_id is stable and filesystem-safe. Keep incrementing in case
+            # an earlier retry of this same job already left a directory behind
+            # at that name too.
+            attempt += 1
+            suffix = str(job.job_id) if attempt == 1 else f"{job.job_id}_{attempt}"
+            raw_path = f"{base_path}_{suffix}"
+            logging.info(f"{base_path} exists.  Trying {raw_path}")
+        except OSError as os_error:
             err = f"Couldn't create the base file path: {raw_path}. Probably a permissions error"
             logging.error(err)
-    else:
-        logging.info(f"{raw_path} exists.  Adding timestamp.")
-        raw_path = os.path.join(str(job.config.RAW_PATH), f"{job.title}_{job.stage}")
-        logging.info(f"raw_path is {raw_path}")
-        try:
-            os.makedirs(raw_path)
-        except OSError:
-            err = f"Couldn't create the base file path: {raw_path}. Probably a permissions error"
-            raise OSError(err) from OSError
-    return raw_path
+            raise OSError(err) from os_error
 
 
 def prep_mkv():
@@ -1119,6 +1175,7 @@ class MakeMKVOutputChecker:
     }
 
     LOG_ONLY_CODES = {
+        MessageID.KEY_EXPIRED: logging.critical,
         MessageID.RIP_DISC_OPEN_ERROR: logging.info,
         MessageID.RIP_TITLE_ERROR: logging.warning,
         MessageID.RIP_COMPLETED: logging.info,
@@ -1216,6 +1273,25 @@ class MakeMKVOutputChecker:
         return self.data
 
 
+class MakeMkvKeyExpiredError(MakeMkvRuntimeError):
+    """
+    `makemkvcon` refused to run because it has no valid registration key.
+
+    MakeMKV reports this as "This application version is too old" whatever the
+    version - what has really happened is that the free beta key has expired.
+    """
+
+    KEY_EXPIRED_MESSAGE = ("MakeMKV's beta key has expired, so it won't run. Waiting for a new key to be "
+                           "posted at https://forum.makemkv.com/forum/viewtopic.php?f=5&t=1053 - ARM picks "
+                           "it up automatically, so re-insert the disc once it is up.")
+
+    def __init__(self, returncode, cmd, output=None, stderr=None):
+        super().__init__(returncode, cmd, output=output, stderr=stderr)
+        self.message = self.KEY_EXPIRED_MESSAGE
+        self.args = (self.message,)
+        logging.error(self.message)
+
+
 def run(options, select):
     """
     Run makemkv with input cli options and yield selected messages
@@ -1226,7 +1302,8 @@ def run(options, select):
     Yields:
         dataclasses of selected type
     Raises:
-        MakeMkvRuntimeError on makemkvcon exit code
+        MakeMkvKeyExpiredError if makemkvcon fails because its key has expired
+        MakeMkvRuntimeError on any other makemkvcon exit code
     """
     if not isinstance(options, (tuple, list)):
         raise TypeError(options)
@@ -1242,6 +1319,7 @@ def run(options, select):
     ]
     cmd += list(options)
     buffer = []
+    key_expired = False
     logging.debug(f"command: '{' '.join(cmd)}'")
     with subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True) as proc:
         logging.debug(f"PID {proc.pid}: command: '{' '.join(cmd)}'")
@@ -1258,8 +1336,12 @@ def run(options, select):
                 buffer.append(line)
                 continue
             logging.debug(data)
+            if getattr(data, "code", None) in KEY_EXPIRED_CODES:
+                key_expired = True
             if msg_type in select:
                 yield data
+    if proc.returncode and key_expired:
+        raise MakeMkvKeyExpiredError(proc.returncode, cmd, output=os.linesep.join(buffer))
     if proc.returncode:
         raise MakeMkvRuntimeError(proc.returncode, cmd, output=os.linesep.join(buffer))
     if buffer and proc.returncode:
@@ -1268,61 +1350,93 @@ def run(options, select):
     logging.info("MakeMKV exits gracefully.")
 
 
-def manual_wait(job) -> bool:
+def manual_select_tracks(job):
     """
-    Pause execution to allow for user interaction and monitor job readiness.
+    Manual mode: scan the disc's tracks as soon as it's identified, then wait for
+    the user to pick the tracks to rip (and fix the title if needed) in the UI.
 
-    This function initiates a manual wait mode for a specified job, notifying the user
-    to configure job parameters within a set time limit. The function sends periodic
-    reminders and checks the job's readiness state. If the job is set to `manual_start`
-    before the timeout, it exits early; otherwise, it continues until time expires.
+    Runs before the job's title/output paths are worked out, so a title the user
+    sets while we wait is what the rip actually gets saved under.
 
     Parameters:
-        job (Job): An instance of the job to monitor, which includes attributes
-                   such as `job_id` and `manual_start` indicating job readiness.
+        job: arm.models.job.Job
+
+    Raises:
+        utils.RipperException: if the user never submits a track selection
+    """
+    # confirm MKV is working, beta key hasn't expired
+    prep_mkv()
+    set_disc_index(job)
+    logging.info("Manual mode: scanning disc tracks")
+    get_track_info(job.drive.mdisc, job)
+    utils.database_updater({"status": JobState.MANUAL_WAIT_STARTED.value}, job)
+
+    if not wait_for_manual_start(job):
+        title = "ARM is Sad - Job Abandoned"
+        message = "You left me alone in the cold and dark, I forgot who I was. Your job has been abandoned."
+        notify(job, title, message)
+        raise utils.RipperException("Manual mode: Timed out waiting for user input")
+
+    if job.title_manual:
+        logging.info("Manual override found.  Overriding auto identification values.")
+        utils.database_updater({"hasnicetitle": True, "updated": True}, job)
+    utils.database_updater({"status": JobState.VIDEO_RIPPING.value}, job)
+
+
+def wait_for_manual_start(job, wait_minutes: int = 30, poll_seconds: int = 15) -> bool:
+    """
+    Wait for the user to submit their track selection (job.manual_start).
+
+    The UI signals this process (Job.wake_for_manual_start) as soon as the user
+    submits, so the rip starts right away. The database is also re-checked every
+    poll_seconds in case that signal never arrives.
+
+    Parameters:
+        job (Job): the job waiting on the user
+        wait_minutes: how long to wait before giving up
+        poll_seconds: longest time between database checks
 
     Returns:
-        bool: `True` if the user sets the job to ready (`manual_start` is enabled)
-              within the wait time, otherwise `False`.
+        bool: True if the user submitted in time, otherwise False
 
     Notes:
-        - The function checks in one minute intervals for state changes
-        - A reminder is sent every 10 minutes.
+        - A reminder is sent every 5 minutes.
         - A final notification is sent when one minute is left, warning of potential
           cancellation.
     """
-    user_ready = False
-    wait_time: int = 30
-
     title = "Manual Mode Activated!"
-    message = f"ARM has taken it's hands off the wheels. You have {wait_time} minutes to set the job."
+    message = f"ARM has taken it's hands off the wheels. You have {wait_minutes} minutes to set the job."
     notify(job, title, message)
 
-    # Wait for the user to set the files and then start
     title = "Waiting for input on job!"
-    for i in range(wait_time, 0, -1):
-        # Wait for a minute
-        sleep(60)
+    deadline = monotonic() + wait_minutes * 60
+    # Minutes-left marks to send a reminder at
+    reminders = list(range(wait_minutes - 5, 0, -5)) + [1]
+    # Block the wake signal so one arriving outside sigtimedwait() stays pending
+    # (and is picked up by the next call) rather than being handled and lost
+    wake_signals = {MANUAL_START_SIGNAL}
+    signal.pthread_sigmask(signal.SIG_BLOCK, wake_signals)
+    try:
+        while True:
+            db.session.refresh(job)
+            remaining = deadline - monotonic()
+            logging.debug(f"Wait time logging: [{remaining:.0f}]s left - Ready: [{job.manual_start}]")
+            if job.manual_start:
+                notify(job, "The Wait is Over", "Thanks for not forgetting me, I am now processing your job.")
+                return True
+            if remaining <= 0:
+                return False
 
-        # Refresh job data
-        db.session.refresh(job)
-        logging.debug(f"Wait time logging: [{i}] mins - Ready: [{job.manual_start}]")
-
-        # Check the job state (true once ready)
-        if job.manual_start:
-            user_ready = True
-            title = "The Wait is Over"
-            message = "Thanks for not forgetting me, I am now processing your job."
-            notify(job, title, message)
-            break
-        else:
-            # If nothing has happened, remind the user every 5 minutes
-            if i % 5 == 0 and i != wait_time:
-                body = f"Don't forget me, I need your help to continue doing ARM things!. You have {i} minutes."
+            while reminders and remaining <= reminders[0] * 60:
+                minutes_left = reminders.pop(0)
+                if minutes_left == 1:
+                    body = "ARM is about to cancel this job!!! You have less than 1 minute left!"
+                else:
+                    body = f"Don't forget me, I need your help to continue doing ARM things!. " \
+                           f"You have {minutes_left} minutes."
                 notify(job, title, body)
 
-            if i == 1:
-                body = "ARM is about to cancel this job!!! You have less than 1 minute left!"
-                notify(job, title, body)
-
-    return user_ready
+            until_next_reminder = remaining - reminders[0] * 60 if reminders else remaining
+            signal.sigtimedwait(wake_signals, min(until_next_reminder, poll_seconds))
+    finally:
+        signal.pthread_sigmask(signal.SIG_UNBLOCK, wake_signals)
