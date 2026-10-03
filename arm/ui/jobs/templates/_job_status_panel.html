@@ -1,0 +1,71 @@
+{#
+    jobdetail.html's live status panel - the swap target of its
+    /json?mode=job poll (see FRAGMENT_TEMPLATES in jobs.py). `job` is
+    json_api.build_job_result()'s dict, so every value is a string ("None"
+    for nulls). Also out-of-band swaps the header's status badge so it
+    tracks the job live instead of freezing at page load.
+#}
+{% import "_job_status.html" as st %}
+{% set tone = st.tone(job) %}
+{% set label = job.status_label or job.status %}
+{{ st.badge(job, oob=true) }}
+<div class="card status-panel tone-{{ tone }}">
+    <div class="card-body">
+        {% if job.status == 'success' %}
+            <div class="d-flex align-items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="currentColor" class="text-success flex-shrink-0" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M16 8A8 8 0 1 1 0 8a8 8 0 0 1 16 0m-3.97-3.03a.75.75 0 0 0-1.08.022L7.477 9.417 5.384 7.323a.75.75 0 0 0-1.06 1.06L6.97 11.03a.75.75 0 0 0 1.079-.02l3.992-4.99a.75.75 0 0 0-.01-1.05z"/>
+                </svg>
+                <div>
+                    <div class="fw-semibold">Complete</div>
+                    <div class="small text-muted">
+                        Finished{% if job.job_length not in (none, '', 'None') %} in {{ job.job_length }}{% endif %}.
+                    </div>
+                </div>
+            </div>
+        {% elif job.status in ('fail', 'transcode_failed') %}
+            <div class="fw-semibold text-danger mb-2">{{ label }}</div>
+            {% if job.errors not in (none, '', 'None') %}
+                <pre class="status-error mb-3">{{ job.errors }}</pre>
+            {% else %}
+                <p class="small text-muted">No error details were recorded &mdash; the log should have more.</p>
+            {% endif %}
+            <div class="d-flex flex-wrap gap-2">
+                {% if job.status == 'transcode_failed' %}
+                    <button type="button" class="btn btn-sm btn-primary"
+                            hx-get="/json?job={{ job.job_id }}&mode=retry_transcode"
+                            hx-confirm="Retry transcoding this job using the files already ripped from the disc?"
+                            data-confirm-title="Retry transcoding this job?"
+                            hx-swap="none"
+                            hx-on::after-request="if(event.detail.successful) location.reload()">Retry transcode</button>
+                {% elif job.disctype in ('dvd', 'bluray') %}
+                    <button type="button" class="btn btn-sm btn-primary"
+                            hx-get="/json?job={{ job.job_id }}&mode=rip_via_iso"
+                            hx-confirm="Make sure the disc is back in the drive. ARM will first make a tolerant copy of the whole disc to an ISO (this can take a long time and a lot of disk space), then retry the rip from that. Continue?"
+                            data-confirm-title="Rip via ISO?"
+                            hx-swap="none"
+                            hx-on::after-request="if(event.detail.successful) location.reload()">Rip via ISO</button>
+                {% endif %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="/logs?logfile={{ job.logfile }}&mode=full&job_id={{ job.job_id }}">View log</a>
+            </div>
+        {% elif job.status == 'waiting' %}
+            <div class="fw-semibold mb-1">{{ label }}</div>
+            <div class="small text-muted">
+                {% if label.startswith('Waiting for your') %}
+                    Choose which tracks to rip in the Tracks list below, then click Update.
+                {% else %}
+                    ARM is pausing so you can correct the title before it rips &mdash; use Title search or Custom title above.
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="fw-semibold mb-2">{{ label }}</div>
+            {% set progress %}{% include "_job_progress.html" %}{% endset %}
+            {% if progress|trim %}
+                {{ progress }}
+            {% else %}
+                <div class="small text-muted">No progress reported yet.</div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>

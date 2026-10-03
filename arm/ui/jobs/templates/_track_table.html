@@ -1,79 +1,105 @@
 {#
-    Track list + track-selection form for jobdetail.html. Split out so it can
-    be re-rendered by the Refresh button's /jobdetail_tracks fetch (see
-    jobdetail.html) once MakeMKV's disc scan has written Track rows for a job
-    that had none yet at page load - manual_edit can also flip true/false as
-    that happens, so it's re-evaluated here too, not just the track list itself.
+    Tracks card body for jobdetail.html (header, table, and selection
+    controls). Split out so the refresh button can re-render it via
+    /jobdetail_tracks once MakeMKV's disc scan has written Track rows for a
+    job that had none at page load - manual_edit can also flip as that
+    happens, so it's re-evaluated here rather than in jobdetail.html. The
+    header lives in here too so the track count stays in sync.
     Expects: jobs, tracks, form, manual_edit, current_min_length.
 #}
-<form method="POST" action="/jobdetailload?job_id={{ jobs.job_id }}">
-    <table id="tracktable" class="table table-striped" aria-label="Tracks">
-        <thead class="bg-secondary">
-        <tr>
-            <th scope="col">Track #</th>
-            {% if jobs.video_type == "Music" %}
-                <th scope="col">Track Name</th>
-            {% endif %}
-            <th scope="col">
-                <button type="button" id="toggle-time-format" class="btn btn-primary" title="Click to toggle time format">
-                    <span id="time-format-label">seconds</span>
-                </button>
-            </th>
-            <th scope="col">FPS</th>
-            <th scope="col">Aspect Ratio</th>
-            <th scope="col">Chapters</th>
-            <th scope="col">Size</th>
-            <th scope="col">Main Feature</th>
-            {% if jobs.video_type != "Music" %}
-                <th scope="col">Manual Process</th>
-            {% endif %}
-            <th scope="col">Ripped</th>
-        </tr>
-        </thead>
-        <tbody>
-        {% for track in tracks %}
-            <tr>
-                <td><strong>{{ track.track_number }}</strong></td>
-                {% if jobs.video_type == "Music" %}
-                    <td><strong>{{ track.filename}}</strong></td>
-                {% endif %}
-                <td>
-                    <span class="length-seconds">{{ track.length }}{{ " (Milliseconds)" if jobs.video_type == "Music" else "" }}</span>
-                    <span class="length-formatted d-none" data-seconds="{{ track.length }}"></span>
-                </td>
-                <td>{{ track.fps }}</td>
-                <td>{{ track.aspect_ratio }}</td>
-                <td>{{ track.chapters }}</td>
-                <td>{{ "%.2f GB"|format(track.filesize / (1024**3)) if track.filesize else "Unknown" }}</td>
-                <td>{{ track.main_feature }}</td>
-                {% if jobs.video_type != "Music" %}
-                    <td class="text-center">
-                            {{ form.track_ref[loop.index0].checkbox }}
-                            {{ form.track_ref[loop.index0].track_ref }}
-                    </td>
-                {% endif %}
-                <td>{{ track.ripped }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
-    {% if manual_edit  %}
-        {{ form.hidden_tag() }}
-        <button type="submit" class="btn btn-primary btn-sm" name="submit">Update</button>
-    {% endif %}
-</form>
+{% set is_music = jobs.video_type == "Music" %}
+<div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2">
+    <span class="fw-semibold">Tracks <span class="text-muted fw-normal">({{ tracks|length }})</span></span>
+    <div class="d-flex align-items-center gap-2">
+        <button type="button" id="toggle-time-format" class="btn btn-sm btn-outline-secondary"
+                title="Toggle length format">Length: <span id="time-format-label">seconds</span></button>
+        <button type="button" class="btn btn-sm btn-outline-secondary"
+                hx-get="/jobdetail_tracks?job_id={{ jobs.job_id }}"
+                hx-target="#track_table_section" hx-swap="innerHTML"
+                title="Refresh track list" aria-label="Refresh track list">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+            </svg>
+        </button>
+    </div>
+</div>
+{% if manual_edit %}
+    <div class="alert alert-warning rounded-0 border-0 border-bottom mb-0 small">
+        Pick the tracks to rip, then click <strong>Update</strong>. Not seeing a track you expected?
+        Lower the minimum length below and rescan.
+    </div>
+{% endif %}
+{% if tracks %}
+    <form method="POST" action="/jobdetailload?job_id={{ jobs.job_id }}">
+        <div class="table-responsive">
+            <table id="tracktable" class="table table-hover align-middle mb-0" aria-label="Tracks">
+                <thead>
+                <tr>
+                    <th scope="col">#</th>
+                    {% if is_music %}<th scope="col">Name</th>{% endif %}
+                    <th scope="col">Length</th>
+                    <th scope="col">Chapters</th>
+                    <th scope="col">Size</th>
+                    <th scope="col">Aspect</th>
+                    <th scope="col">FPS</th>
+                    {% if not is_music %}<th scope="col" class="text-center">Rip</th>{% endif %}
+                    <th scope="col" class="text-center">Ripped</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for track in tracks %}
+                    <tr class="{{ 'table-active' if track.main_feature }}">
+                        <td class="text-nowrap">
+                            <strong>{{ track.track_number }}</strong>
+                            {% if track.main_feature %}<span class="badge text-bg-primary ms-1">Main</span>{% endif %}
+                        </td>
+                        {% if is_music %}<td>{{ track.filename }}</td>{% endif %}
+                        <td class="text-nowrap">
+                            <span class="length-seconds">{{ track.length }}{{ " ms" if is_music else "" }}</span>
+                            <span class="length-formatted d-none" data-seconds="{{ track.length }}"></span>
+                        </td>
+                        <td>{{ track.chapters if track.chapters is not none else '—' }}</td>
+                        <td class="text-nowrap">{{ "%.2f GB"|format(track.filesize / (1024**3)) if track.filesize else '—' }}</td>
+                        <td>{{ track.aspect_ratio or '—' }}</td>
+                        <td>{{ track.fps or '—' }}</td>
+                        {% if not is_music %}
+                            <td class="text-center">
+                                {{ form.track_ref[loop.index0].checkbox }}
+                                {{ form.track_ref[loop.index0].track_ref }}
+                            </td>
+                        {% endif %}
+                        <td class="text-center">
+                            {% if track.ripped %}
+                                <span class="text-success" title="Ripped">&#10003;</span>
+                            {% else %}
+                                <span class="text-muted" title="Not ripped">&ndash;</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if manual_edit %}
+            <div class="card-footer d-flex justify-content-end">
+                {{ form.hidden_tag() }}
+                <button type="submit" class="btn btn-primary btn-sm" name="submit">Update</button>
+            </div>
+        {% endif %}
+    </form>
+{% else %}
+    <div class="card-body small text-muted">
+        No tracks yet &mdash; they'll appear once ARM finishes scanning the disc. Use the refresh button to check again.
+    </div>
+{% endif %}
 {% if manual_edit %}
     <form method="POST" action="/rescan_tracks?job_id={{ jobs.job_id }}"
-          class="row row-cols-auto g-2 align-items-center mt-2">
+          class="card-footer d-flex flex-wrap align-items-center gap-2 small">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <label for="min_length" class="col-auto col-form-label">Minimum track length to include (seconds):</label>
-        <div class="col-auto">
-            <input type="number" id="min_length" name="min_length" min="0"
-                  value="{{ current_min_length }}" class="form-control form-control-sm"
-                  style="width: 100px;">
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-secondary btn-sm">Rescan Disc</button>
-        </div>
+        <label for="min_length" class="mb-0">Minimum track length (seconds):</label>
+        <input type="number" id="min_length" name="min_length" min="0"
+               value="{{ current_min_length }}" class="form-control form-control-sm" style="width: 100px;">
+        <button type="submit" class="btn btn-secondary btn-sm">Rescan disc</button>
     </form>
 {% endif %}

@@ -57,10 +57,10 @@ FRAGMENT_TEMPLATES = {
     'rip_via_iso': '_empty.html',
     'send_item': '_send_item_card.html',
     'change_job_params': '_empty.html',
-    # jobdetail.html's own progress section (json_api.get_job) - unlike the
+    # jobdetail.html's live status panel (json_api.get_job) - unlike the
     # other modes its data lives under a `result` key, not spread at the top
     # level, and it also gets a special HTTP status (see feed_json below).
-    'job': '_job_progress.html',
+    'job': '_job_status_panel.html',
 }
 
 # send_item returns one flat job dict (see ui_utils.send_to_remote_db), not the
@@ -136,7 +136,8 @@ def jobdetail():
                            s=search_results,
                            manual_edit=manual_edit,
                            current_min_length=current_min_length,
-                           form=track_form)
+                           form=track_form,
+                           date_format=cfg.arm_config['DATE_FORMAT'])
 
 
 @route_jobs.route('/jobdetail_tracks')

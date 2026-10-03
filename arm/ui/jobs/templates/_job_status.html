@@ -1,0 +1,27 @@
+{#
+    Status color/badge macros shared by jobdetail.html's header (rendered
+    from the Job model) and _job_status_panel.html (rendered from
+    json_api.build_job_result()'s all-strings dict) - both expose .status
+    and .status_label, so the same macros work for either.
+#}
+{% macro tone(job) -%}
+    {%- if job.status == 'success' -%}success
+    {%- elif job.status in ('fail', 'transcode_failed') -%}danger
+    {%- elif job.status == 'waiting' -%}warning
+    {%- elif job.status in ('queued', 'waiting_transcode') -%}secondary
+    {%- else -%}primary
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro badge(job, oob=false) -%}
+    {%- set t = tone(job) -%}
+    <span id="jobStatusBadge" class="badge rounded-pill text-bg-{{ t }} job-status-badge"
+          {%- if oob %} hx-swap-oob="true"{% endif %}>
+        {%- if t == 'primary' %}<span class="spinner-grow me-2" aria-hidden="true"></span>{% endif -%}
+        {{ job.status_label or job.status }}
+    </span>
+{%- endmacro %}
+
+{% macro disc_type(disctype) -%}
+    {{ {'bluray': 'Blu-ray', 'dvd': 'DVD', 'music': 'Audio CD', 'data': 'Data disc'}.get(disctype, disctype or 'Unknown disc') }}
+{%- endmacro %}
