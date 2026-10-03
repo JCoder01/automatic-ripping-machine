@@ -415,3 +415,9 @@
 .job-debug[open] > summary::before {
     transform: rotate(90deg);
 }
+
+/* Let the polled status panel fill its column so it lines up with the
+   Timeline card next to it. */
+#job_progress_section > .status-panel {
+    height: 100%;
+}

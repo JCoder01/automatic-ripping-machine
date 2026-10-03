@@ -8,9 +8,9 @@
     {{ value if value not in (none, '', 'None') else '—' }}
 {%- endmacro %}
 
-{% macro manual_note(manual, auto) -%}
+{% macro manual_note(manual, auto, what='') -%}
     {%- if manual not in (none, '', 'None') and auto not in (none, '', 'None') and manual != auto -%}
-        <div class="small text-muted">Set manually &middot; detected as {{ auto }}</div>
+        <div class="small text-muted">{{ what ~ ' set' if what else 'Set' }} manually &middot; detected as {{ auto }}</div>
     {%- endif -%}
 {%- endmacro %}
 
@@ -42,15 +42,24 @@
                 <div class="text-muted mb-2">
                     {{ (jobs.video_type or 'unknown')|capitalize }} &middot; {{ st.disc_type(jobs.disctype) }}
                     &middot; {{ jobs.devpath }} &middot; Job #{{ jobs.job_id }}
+                    {{ manual_note(jobs.title_manual, jobs.title_auto, 'Title') }}
                 </div>
-                {% if ratings %}
+                {% set imdb_url = 'https://www.imdb.com/title/' ~ jobs.imdb_id ~ '/' if jobs.imdb_id not in (none, '', 'None') and not is_music else none %}
+                {% set has_imdb_rating = ratings|selectattr('Source', 'equalto', 'Internet Movie Database')|list %}
+                {% if ratings or imdb_url %}
                     <div class="d-flex flex-wrap gap-2 mb-2">
                         {% for rating in ratings %}
-                            <span class="badge rating-pill">
+                            {% set linked = imdb_url and rating['Source'] == 'Internet Movie Database' %}
+                            <{{ 'a' if linked else 'span' }} class="badge rating-pill"
+                                {%- if linked %} href="{{ imdb_url }}" target="_blank" rel="noopener"{% endif %}>
                                 {{ rating_names.get(rating['Source'], rating['Source']) }}
                                 <strong>{{ rating['Value'].split('/')[0] if '/' in rating['Value'] else rating['Value'] }}</strong>
-                            </span>
+                                {%- if linked %} &#8599;{% endif %}
+                            </{{ 'a' if linked else 'span' }}>
                         {% endfor %}
+                        {% if imdb_url and not has_imdb_rating %}
+                            <a class="badge rating-pill" href="{{ imdb_url }}" target="_blank" rel="noopener">IMDb &#8599;</a>
+                        {% endif %}
                     </div>
                 {% endif %}
                 {% if jobs.plot %}
@@ -98,21 +107,19 @@
         </div>
     </div>
 
-    <div class="row g-4">
-        <!-- Left: live status + tracks -->
-        <div class="col-lg-8 d-flex flex-column gap-4">
-            <div id="job_progress_section"
+    {% set show_rip = not is_music and jobs.config %}
+    {% set bd = jobs.disctype == 'bluray' %}
+
+    <!-- Status + timeline: both short, so they sit side by side -->
+    <div class="row g-4 mb-4">
+        <div class="col-lg-8">
+            <div id="job_progress_section" class="h-100"
                  hx-get="/json?mode=job&job={{ jobs.job_id }}"
                  hx-trigger="load, every {{ armui_cfg['index_refresh'] }}ms"
                  hx-swap="innerHTML"></div>
-            <div id="track_table_section" class="card">
-                {% include "_track_table.html" %}
-            </div>
         </div>
-
-        <!-- Right: reference details, grouped -->
-        <div class="col-lg-4 d-flex flex-column gap-3">
-            <div class="card">
+        <div class="col-lg-4">
+            <div class="card h-100">
                 <div class="card-header fw-semibold">Timeline</div>
                 <div class="card-body">
                     <dl class="detail-list">
@@ -122,28 +129,18 @@
                     </dl>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div class="card">
-                <div class="card-header fw-semibold">Details</div>
-                <div class="card-body">
-                    <dl class="detail-list">
-                        <dt>Title</dt><dd>{{ val(jobs.title) }}{{ manual_note(jobs.title_manual, jobs.title_auto) }}</dd>
-                        <dt>Year</dt><dd>{{ val(jobs.year) }}{{ manual_note(jobs.year_manual, jobs.year_auto) }}</dd>
-                        <dt>Type</dt><dd>{{ val(jobs.video_type) }}{{ manual_note(jobs.video_type_manual, jobs.video_type_auto) }}</dd>
-                        {% if not is_music %}
-                            <dt>IMDb</dt>
-                            <dd>
-                                {% if jobs.imdb_id not in (none, '', 'None') %}
-                                    <a href="https://www.imdb.com/title/{{ jobs.imdb_id }}/" target="_blank" rel="noopener">{{ jobs.imdb_id }}</a>
-                                {% else %}&mdash;{% endif %}
-                                {{ manual_note(jobs.imdb_id_manual, jobs.imdb_id_auto) }}
-                            </dd>
-                        {% endif %}
-                    </dl>
-                </div>
-            </div>
+    <!-- Tracks: full width, since the table has a lot of columns -->
+    <div id="track_table_section" class="card mb-4">
+        {% include "_track_table.html" %}
+    </div>
 
-            <div class="card">
+    <!-- Reference details: equal-height cards in one row -->
+    <div class="row row-cols-1 row-cols-md-2 {{ 'row-cols-xl-3' if show_rip }} g-4 mb-4">
+        <div class="col">
+            <div class="card h-100">
                 <div class="card-header fw-semibold">Disc</div>
                 <div class="card-body">
                     <dl class="detail-list">
@@ -155,8 +152,9 @@
                     </dl>
                 </div>
             </div>
-
-            <div class="card">
+        </div>
+        <div class="col">
+            <div class="card h-100">
                 <div class="card-header fw-semibold">Output</div>
                 <div class="card-body">
                     <dl class="detail-list">
@@ -171,11 +169,11 @@
                     </dl>
                 </div>
             </div>
-
-            {% if not is_music and jobs.config %}
-                {% set bd = jobs.disctype == 'bluray' %}
-                {% set hb_args = jobs.config.HB_ARGS_BD if bd else jobs.config.HB_ARGS_DVD %}
-                <div class="card">
+        </div>
+        {% if show_rip %}
+            {% set hb_args = jobs.config.HB_ARGS_BD if bd else jobs.config.HB_ARGS_DVD %}
+            <div class="col">
+                <div class="card h-100">
                     <div class="card-header fw-semibold">Rip settings</div>
                     <div class="card-body">
                         <dl class="detail-list">
@@ -188,11 +186,16 @@
                         </dl>
                     </div>
                 </div>
-            {% endif %}
+            </div>
+        {% endif %}
+    </div>
 
-            <details class="card job-debug">
-                <summary class="card-header fw-semibold">Debug info</summary>
-                <div class="card-body">
+    <!-- Internals, out of the way -->
+    <details class="card job-debug">
+        <summary class="card-header fw-semibold">Debug info</summary>
+        <div class="card-body">
+            <div class="row g-4">
+                <div class="col-md-6">
                     <dl class="detail-list small">
                         <dt>Job ID</dt><dd>{{ jobs.job_id }}</dd>
                         <dt>Status</dt><dd><code>{{ jobs.status }}</code></dd>
@@ -202,6 +205,12 @@
                         <dt>PID hash</dt><dd>{{ val(jobs.pid_hash) }}</dd>
                         <dt>Config ID</dt><dd>{{ val(jobs.config.CONFIG_ID if jobs.config else none) }}</dd>
                         <dt>Nice title</dt><dd>{{ val(jobs.hasnicetitle) }}</dd>
+                        {% if jobs.transcode_out_path %}<dt>Transcode out</dt><dd>{{ jobs.transcode_out_path }}</dd>{% endif %}
+                        {% if jobs.iso_path %}<dt>ISO</dt><dd>{{ jobs.iso_path }}</dd>{% endif %}
+                    </dl>
+                </div>
+                <div class="col-md-6">
+                    <dl class="detail-list small">
                         <dt>Title</dt><dd>auto: {{ val(jobs.title_auto) }}<br>manual: {{ val(jobs.title_manual) }}</dd>
                         <dt>Year</dt><dd>auto: {{ val(jobs.year_auto) }}<br>manual: {{ val(jobs.year_manual) }}</dd>
                         <dt>Type</dt><dd>auto: {{ val(jobs.video_type_auto) }}<br>manual: {{ val(jobs.video_type_manual) }}</dd>
@@ -209,13 +218,11 @@
                         <dt>Poster</dt><dd>{{ val(jobs.poster_url) }}</dd>
                         <dt>Poster (auto)</dt><dd>{{ val(jobs.poster_url_auto) }}</dd>
                         <dt>Poster (manual)</dt><dd>{{ val(jobs.poster_url_manual) }}</dd>
-                        {% if jobs.transcode_out_path %}<dt>Transcode out</dt><dd>{{ jobs.transcode_out_path }}</dd>{% endif %}
-                        {% if jobs.iso_path %}<dt>ISO</dt><dd>{{ jobs.iso_path }}</dd>{% endif %}
                     </dl>
                 </div>
-            </details>
+            </div>
         </div>
-    </div>
+    </details>
 {% endblock %}
 {% block footer %}{{ super() }}{% endblock %}
 {% block js %}
