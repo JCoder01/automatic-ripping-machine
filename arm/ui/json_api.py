@@ -756,9 +756,18 @@ def rip_via_iso(job_id):
     return json_return
 
 
+TERMINATE_GRACE_SECONDS = 5
+
+
 def terminate_process(pid):
     """
-    Terminates the process associated with a given pid.
+    Terminates the process associated with a given pid, along with every process
+    it spawned (MakeMKV, HandBrake, ddrescue, ... and their shell wrappers).\n
+    Children are collected *before* the parent is signalled, since killing the
+    parent reparents them to init and they can no longer be found through it.
+    They get SIGTERM first, then SIGKILL after a short grace period. A process
+    stuck in uninterruptible I/O (e.g. ddrescue on a failing disc) ignores both
+    until the drive returns, so survivors are logged rather than treated as an error.
     :param pid: Process ID (int)
     :raises: ValueError if access is denied
     """
@@ -768,7 +777,22 @@ def terminate_process(pid):
         return
     try:
         job_process = psutil.Process(pid)
-        job_process.terminate()  # or job_process.kill()
+        targets = job_process.children(recursive=True) + [job_process]
+        for proc in targets:
+            try:
+                proc.terminate()
+            except psutil.NoSuchProcess:
+                pass
+        _, alive = psutil.wait_procs(targets, timeout=TERMINATE_GRACE_SECONDS)
+        for proc in alive:
+            try:
+                proc.kill()
+            except psutil.NoSuchProcess:
+                pass
+        _, stuck = psutil.wait_procs(alive, timeout=TERMINATE_GRACE_SECONDS)
+        for proc in stuck:
+            app.logger.warning(f"Process {proc.pid} (child of job pid {pid}) is still alive after SIGKILL; "
+                               "it is probably blocked on device I/O and will exit once that returns.")
     except psutil.NoSuchProcess:
         message = f"Process id {pid} was not found. Job has already been terminated."
         app.logger.warning(message)
